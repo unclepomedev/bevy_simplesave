@@ -1,0 +1,29 @@
+default:
+	@just --list
+
+# code ================================================================================================================
+
+fix-rs:
+    cargo clippy --fix --allow-dirty --allow-staged --all-targets --workspace -- -D warnings
+
+# fmt and clippy-fix
+fmt-rs:
+    just fix-rs
+    cargo fmt --all
+
+fmt: fmt-rs
+f: fmt-rs
+
+test-rs:
+    cargo test --workspace
+
+test: test-rs
+
+# local ci ============================================================================================================
+
+check:
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo test --workspace
+
+c: check
