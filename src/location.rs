@@ -21,6 +21,7 @@ pub enum SaveLocation {
 }
 
 impl SaveLocation {
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn resolve(&self) -> Result<PathBuf, SaveError> {
         match self {
             SaveLocation::ExeRelative(sub) => {
@@ -49,5 +50,51 @@ impl SaveLocation {
             }
             SaveLocation::Custom(path) => Ok(path.clone()),
         }
+    }
+}
+
+// ============================================================================================
+// UNIT TESTS
+// ============================================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn custom_returns_path_as_is() {
+        let location = SaveLocation::Custom(PathBuf::from("/tmp/my-game/save.ron"));
+        let resolved = location
+            .resolve()
+            .expect("custom path should always resolve");
+        assert_eq!(resolved, PathBuf::from("/tmp/my-game/save.ron"));
+    }
+
+    #[test]
+    fn exe_relative_joins_sub_path_to_exe_dir() {
+        let location = SaveLocation::ExeRelative(PathBuf::from("saves/settings.ron"));
+        let resolved = location
+            .resolve()
+            .expect("current_exe should be available in tests");
+
+        let expected_exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
+        assert_eq!(resolved, expected_exe_dir.join("saves/settings.ron"));
+    }
+
+    #[test]
+    fn app_data_includes_application_name_in_path() {
+        let location = SaveLocation::AppData {
+            qualifier: "dev",
+            organization: "ExampleStudio",
+            application: "ExampleGame",
+            sub: PathBuf::from("settings.ron"),
+        };
+        let resolved = location.resolve().expect("should resolve on CI runners");
+
+        let resolved_str = resolved.to_string_lossy();
+        assert!(
+            resolved_str.contains("ExampleGame"),
+            "resolved path `{resolved_str}` should include the application name"
+        );
+        assert!(resolved_str.ends_with("settings.ron"));
     }
 }
