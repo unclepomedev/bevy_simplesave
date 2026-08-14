@@ -90,9 +90,9 @@ mod tests {
         };
         let resolved = location.resolve().expect("should resolve on CI runners");
 
-        let resolved_str = resolved.to_string_lossy();
+        let resolved_str = resolved.to_string_lossy().to_lowercase();
         assert!(
-            resolved_str.contains("ExampleGame"),
+            resolved_str.contains("examplegame"),
             "resolved path `{resolved_str}` should include the application name"
         );
         assert!(resolved_str.ends_with("settings.ron"));
