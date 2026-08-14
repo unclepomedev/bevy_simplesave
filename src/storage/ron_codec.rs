@@ -12,6 +12,9 @@ pub(crate) fn deserialize_from_ron<R: DeserializeOwned>(s: &str) -> Result<R, Sa
     ron::from_str(s).map_err(SaveError::Deserialize)
 }
 
+// ============================================================================================
+// UNIT TESTS
+// ============================================================================================
 #[cfg(test)]
 mod tests {
     use super::*;
