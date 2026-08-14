@@ -9,6 +9,7 @@ pub enum SaveError {
     Io { path: PathBuf, source: IoError },
     Serialize(RonError),
     Deserialize(SpannedError),
+    LocationUnavailable(String),
 }
 
 impl Display for SaveError {
@@ -19,6 +20,9 @@ impl Display for SaveError {
             }
             SaveError::Serialize(e) => write!(f, "failed to serialize to RON: {e}"),
             SaveError::Deserialize(e) => write!(f, "failed to deserialize from RON: {e}"),
+            SaveError::LocationUnavailable(reason) => {
+                write!(f, "could not resolve save location: {reason}")
+            }
         }
     }
 }
