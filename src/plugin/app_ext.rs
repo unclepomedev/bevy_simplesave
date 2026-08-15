@@ -1,6 +1,7 @@
 use super::SavePath;
 use super::systems::auto_save_system;
 use crate::resource::{load_resource, save_resource};
+use crate::saveable::Saveable;
 use crate::{SaveError, SaveFailed, SaveLocation, SaveTiming};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -30,6 +31,10 @@ pub trait SaveAppExt {
     ) -> &mut Self
     where
         R: Resource + Serialize + DeserializeOwned + Default;
+
+    fn register_saveable<R: Saveable>(&mut self, location: SaveLocation) -> &mut Self {
+        self.register_saved_resource::<R>(location, R::TIMING)
+    }
 }
 
 impl SaveAppExt for App {
