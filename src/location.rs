@@ -21,10 +21,12 @@ pub enum SaveLocation {
 }
 
 fn validate_sub_path(sub: &Path) -> Result<(), SaveError> {
-    if sub
-        .components()
-        .any(|c| matches!(c, Component::Prefix(_) | Component::RootDir))
-    {
+    if sub.components().any(|c| {
+        matches!(
+            c,
+            Component::Prefix(_) | Component::RootDir | Component::ParentDir
+        )
+    }) {
         return Err(SaveError::InvalidSubPath(sub.to_path_buf()));
     }
     Ok(())
@@ -115,6 +117,20 @@ mod tests {
         let err = resolve_app_data_dir(None, &sub)
             .expect_err("resolve must fail when ProjectDirs is None");
         assert_matches!(err, SaveError::LocationUnavailable(_));
+    }
+
+    #[test]
+    fn validate_sub_path_rejects_parent_dir() {
+        let sub = PathBuf::from("../save.ron");
+        let location = SaveLocation::ExeRelative(sub.clone());
+        let err = location
+            .resolve()
+            .expect_err("parent dir subpath must fail");
+        assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
+
+        let dirs = ProjectDirs::from("dev", "ExampleStudio", "ExampleGame");
+        let err = resolve_app_data_dir(dirs, &sub).expect_err("parent dir subpath must fail");
+        assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
     }
 
     #[test]
