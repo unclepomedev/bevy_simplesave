@@ -1,5 +1,8 @@
-pub(crate) mod fs_io;
-pub(crate) mod ron_codec;
+mod fs_io;
+mod ron_codec;
+
+pub(crate) use fs_io::{read_bytes, write_bytes};
+pub(crate) use ron_codec::{deserialize_from_ron, serialize_to_ron};
 
 // ============================================================================================
 // UNIT TESTS

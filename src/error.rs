@@ -3,6 +3,7 @@ use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IoError;
 use std::path::PathBuf;
+use std::string::FromUtf8Error;
 
 #[derive(Debug)]
 pub enum SaveError {
@@ -11,6 +12,8 @@ pub enum SaveError {
     Deserialize(SpannedError),
     LocationUnavailable(String),
     InvalidSubPath(PathBuf),
+    ResourceMissing(String),
+    InvalidUtf8(FromUtf8Error),
 }
 
 impl Display for SaveError {
@@ -30,6 +33,12 @@ impl Display for SaveError {
                     "sub path `{}` must be relative (no root or drive prefix)",
                     path.display()
                 )
+            }
+            SaveError::ResourceMissing(type_name) => {
+                write!(f, "resource `{type_name}` was not found in the world")
+            }
+            SaveError::InvalidUtf8(e) => {
+                write!(f, "saved file is not valid UTF-8: {e}")
             }
         }
     }
