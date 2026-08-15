@@ -8,6 +8,11 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::any::type_name;
 use std::marker::PhantomData;
 
+/// Marker resource used to guard against registering `auto_save_system::<R>`
+/// more than once if `register_saved_resource::<R>` is called multiple times.
+#[derive(Resource)]
+struct AutoSaveRegistered<R>(PhantomData<fn() -> R>);
+
 /// Explicitly saves a resource that was registered with [`SaveTiming::Manual`]
 /// or force-saves one registered with [`SaveTiming::Auto`].
 pub fn save_now<R: Resource + Serialize>(world: &World) -> Result<(), SaveError> {
@@ -59,7 +64,8 @@ impl SaveAppExt for App {
             phantom_data: PhantomData,
         });
 
-        if timing == SaveTiming::Auto {
+        if timing == SaveTiming::Auto && !world.contains_resource::<AutoSaveRegistered<R>>() {
+            world.insert_resource(AutoSaveRegistered::<R>(PhantomData));
             self.add_message::<SaveFailed>();
             self.add_systems(PostUpdate, auto_save_system::<R>);
         }

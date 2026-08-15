@@ -49,6 +49,7 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
     use std::assert_matches;
+    use std::fs;
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Resource)]
     struct DummySettings {
@@ -111,7 +112,7 @@ mod tests {
     fn load_resource_propagates_parse_errors() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("corrupt.ron");
-        std::fs::write(&path, b"not valid ron {{{").unwrap();
+        fs::write(&path, b"not valid ron {{{").unwrap();
 
         let mut world = World::new();
         let err = load_resource::<DummySettings>(&mut world, &path)

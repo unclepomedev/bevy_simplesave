@@ -26,8 +26,9 @@ mod tests {
     use super::*;
     use crate::SaveLocation;
     use crate::plugin::app_ext::{SaveAppExt, save_now};
-    use bevy_ecs::resource::Resource;
+    use bevy_ecs::prelude::*;
     use serde::{Deserialize, Serialize};
+    use std::fs;
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Resource, Default)]
     struct DummySettings {
@@ -49,7 +50,7 @@ mod tests {
         app.world_mut().resource_mut::<DummySettings>().volume = 0.8;
         app.update();
 
-        let saved = std::fs::read_to_string(&path).expect("file should exist after auto-save");
+        let saved = fs::read_to_string(&path).expect("file should exist after auto-save");
         assert!(saved.contains("0.8"));
     }
 
@@ -75,7 +76,7 @@ mod tests {
     fn register_loads_existing_save_file_on_startup() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.ron");
-        std::fs::write(&path, "(volume: 0.42)").unwrap();
+        fs::write(&path, "(volume: 0.42)").unwrap();
 
         let mut app = App::new();
         app.register_saved_resource::<DummySettings>(
@@ -100,5 +101,64 @@ mod tests {
 
         let resource = app.world().resource::<DummySettings>();
         assert_eq!(*resource, DummySettings::default());
+    }
+
+    #[test]
+    fn repeated_auto_save_registration_preserves_latest_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let path1 = dir.path().join("first.ron");
+        let path2 = dir.path().join("second.ron");
+        let mut app = App::new();
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path1.clone()),
+            SaveTiming::Auto,
+        );
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path2.clone()),
+            SaveTiming::Auto,
+        );
+
+        app.update();
+
+        app.world_mut().resource_mut::<DummySettings>().volume = 0.8;
+        app.update();
+
+        assert!(!path1.exists(), "first path must not be written");
+        let saved = fs::read_to_string(&path2).expect("second path should exist after auto-save");
+        assert!(saved.contains("0.8"));
+    }
+
+    #[test]
+    fn repeated_auto_save_registration_installs_system_only_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("save.ron");
+
+        let mut app = App::new();
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path.clone()),
+            SaveTiming::Auto,
+        );
+        app.register_saved_resource::<DummySettings>(SaveLocation::Custom(path), SaveTiming::Auto);
+
+        app.update();
+
+        // Make the directory read-only so auto-save write fails and emits SaveFailed
+        let original_perms = fs::metadata(dir.path()).unwrap().permissions();
+        let mut read_only_perms = original_perms.clone();
+        read_only_perms.set_readonly(true);
+        fs::set_permissions(dir.path(), read_only_perms).unwrap();
+
+        app.world_mut().resource_mut::<DummySettings>().volume = 0.8;
+        app.update();
+
+        // Restore original permissions so tempdir can clean up
+        let _ = fs::set_permissions(dir.path(), original_perms);
+
+        let messages = app.world().resource::<Messages<SaveFailed>>();
+        assert_eq!(
+            messages.len(),
+            1,
+            "auto_save_system should execute only once"
+        );
     }
 }
