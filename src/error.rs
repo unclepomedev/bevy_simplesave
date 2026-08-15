@@ -10,6 +10,7 @@ pub enum SaveError {
     Serialize(RonError),
     Deserialize(SpannedError),
     LocationUnavailable(String),
+    InvalidSubPath(PathBuf),
 }
 
 impl Display for SaveError {
@@ -22,6 +23,13 @@ impl Display for SaveError {
             SaveError::Deserialize(e) => write!(f, "failed to deserialize from RON: {e}"),
             SaveError::LocationUnavailable(reason) => {
                 write!(f, "could not resolve save location: {reason}")
+            }
+            SaveError::InvalidSubPath(path) => {
+                write!(
+                    f,
+                    "sub path `{}` must be relative (no root or drive prefix)",
+                    path.display()
+                )
             }
         }
     }

@@ -1,7 +1,7 @@
 use crate::error::SaveError;
 use directories::ProjectDirs;
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// Where a saved resource's `.ron` file should live on disk.
 #[derive(Debug, Clone)]
@@ -20,7 +20,18 @@ pub enum SaveLocation {
     Custom(PathBuf),
 }
 
+fn validate_sub_path(sub: &Path) -> Result<(), SaveError> {
+    if sub
+        .components()
+        .any(|c| matches!(c, Component::Prefix(_) | Component::RootDir))
+    {
+        return Err(SaveError::InvalidSubPath(sub.to_path_buf()));
+    }
+    Ok(())
+}
+
 fn resolve_app_data_dir(dirs: Option<ProjectDirs>, sub: &Path) -> Result<PathBuf, SaveError> {
+    validate_sub_path(sub)?;
     let dirs = dirs.ok_or_else(|| {
         SaveError::LocationUnavailable(
             "could not determine a home directory on this platform".into(),
@@ -34,6 +45,7 @@ impl SaveLocation {
     pub(crate) fn resolve(&self) -> Result<PathBuf, SaveError> {
         match self {
             SaveLocation::ExeRelative(sub) => {
+                validate_sub_path(sub)?;
                 let exe = env::current_exe().map_err(|source| SaveError::Io {
                     path: PathBuf::from("<current_exe>"),
                     source,
@@ -103,5 +115,58 @@ mod tests {
         let err = resolve_app_data_dir(None, &sub)
             .expect_err("resolve must fail when ProjectDirs is None");
         assert_matches!(err, SaveError::LocationUnavailable(_));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn exe_relative_rejects_rooted_sub_path_unix() {
+        let sub = PathBuf::from("/root/save.ron");
+        let location = SaveLocation::ExeRelative(sub.clone());
+        let err = location.resolve().expect_err("rooted subpath must fail");
+        assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn app_data_rejects_rooted_sub_path_unix() {
+        let sub = PathBuf::from("/root/save.ron");
+        let dirs = ProjectDirs::from("dev", "ExampleStudio", "ExampleGame");
+        let err = resolve_app_data_dir(dirs, &sub).expect_err("rooted subpath must fail");
+        assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn exe_relative_rejects_rooted_sub_path_windows() {
+        for invalid in [
+            r"C:\saves\settings.ron",
+            r"C:saves\settings.ron",
+            r"\saves\settings.ron",
+            r"\\server\share\settings.ron",
+        ] {
+            let sub = PathBuf::from(invalid);
+            let location = SaveLocation::ExeRelative(sub.clone());
+            let err = location
+                .resolve()
+                .expect_err("rooted/prefixed subpath must fail on Windows");
+            assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
+        }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn app_data_rejects_rooted_sub_path_windows() {
+        for invalid in [
+            r"C:\saves\settings.ron",
+            r"C:saves\settings.ron",
+            r"\saves\settings.ron",
+            r"\\server\share\settings.ron",
+        ] {
+            let sub = PathBuf::from(invalid);
+            let dirs = ProjectDirs::from("dev", "ExampleStudio", "ExampleGame");
+            let err = resolve_app_data_dir(dirs, &sub)
+                .expect_err("rooted/prefixed subpath must fail on Windows");
+            assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
+        }
     }
 }
