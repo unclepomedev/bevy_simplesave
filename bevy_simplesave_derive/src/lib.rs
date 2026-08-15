@@ -14,6 +14,13 @@ pub fn derive_save_resource(input: TokenStream) -> TokenStream {
 }
 
 fn expand(input: &DeriveInput) -> syn::Result<TokenStream2> {
+    if !input.generics.params.is_empty() {
+        return Err(Error::new_spanned(
+            &input.generics,
+            "`#[derive(SaveResource)]` does not support generic types",
+        ));
+    }
+
     let save_attr = find_save_attribute(input)?;
     let timing = parse_timing(save_attr)?;
     let name = &input.ident;

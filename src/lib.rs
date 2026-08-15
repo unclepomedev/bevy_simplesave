@@ -13,7 +13,7 @@ pub use plugin::{SaveAppExt, SavePlugin, SaveTiming, save_now};
 pub use saveable::Saveable;
 
 /// Derives [`Saveable`] for a resource, reading the save timing from
-/// `#[save(timing = "auto" | "manual")]`.
+/// `#[save(timing = auto | manual)]`.
 ///
 /// # Example
 /// ```
