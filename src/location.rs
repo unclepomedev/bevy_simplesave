@@ -120,14 +120,18 @@ mod tests {
     }
 
     #[test]
-    fn validate_sub_path_rejects_parent_dir() {
+    fn exe_relative_rejects_parent_dir() {
         let sub = PathBuf::from("../save.ron");
         let location = SaveLocation::ExeRelative(sub.clone());
         let err = location
             .resolve()
             .expect_err("parent dir subpath must fail");
         assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
+    }
 
+    #[test]
+    fn app_data_rejects_parent_dir() {
+        let sub = PathBuf::from("../save.ron");
         let dirs = ProjectDirs::from("dev", "ExampleStudio", "ExampleGame");
         let err = resolve_app_data_dir(dirs, &sub).expect_err("parent dir subpath must fail");
         assert_matches!(err, SaveError::InvalidSubPath(p) if p == sub);
