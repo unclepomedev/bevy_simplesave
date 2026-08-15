@@ -43,7 +43,6 @@ fn resolve_app_data_dir(dirs: Option<ProjectDirs>, sub: &Path) -> Result<PathBuf
 }
 
 impl SaveLocation {
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn resolve(&self) -> Result<PathBuf, SaveError> {
         match self {
             SaveLocation::ExeRelative(sub) => {

@@ -7,7 +7,6 @@ use std::any::type_name;
 use std::io::ErrorKind;
 use std::path::Path;
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn save_resource<R: Resource + Serialize>(
     world: &World,
     path: &Path,
@@ -15,12 +14,14 @@ pub(crate) fn save_resource<R: Resource + Serialize>(
     let resource = world
         .get_resource::<R>()
         .ok_or_else(|| SaveError::ResourceMissing(type_name::<R>().to_string()))?;
+    write_resource_ron(resource, path)
+}
 
-    let ron_str = storage::serialize_to_ron(resource)?;
+pub(crate) fn write_resource_ron<R: Serialize>(value: &R, path: &Path) -> Result<(), SaveError> {
+    let ron_str = storage::serialize_to_ron(value)?;
     storage::write_bytes(path, ron_str.as_bytes())
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn load_resource<R: Resource + DeserializeOwned>(
     world: &mut World,
     path: &Path,
@@ -48,6 +49,7 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
     use std::assert_matches;
+    use std::fs;
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Resource)]
     struct DummySettings {
@@ -110,7 +112,7 @@ mod tests {
     fn load_resource_propagates_parse_errors() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("corrupt.ron");
-        std::fs::write(&path, b"not valid ron {{{").unwrap();
+        fs::write(&path, b"not valid ron {{{").unwrap();
 
         let mut world = World::new();
         let err = load_resource::<DummySettings>(&mut world, &path)
