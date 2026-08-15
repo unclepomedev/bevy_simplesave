@@ -138,21 +138,16 @@ mod tests {
             SaveLocation::Custom(path.clone()),
             SaveTiming::Auto,
         );
-        app.register_saved_resource::<DummySettings>(SaveLocation::Custom(path), SaveTiming::Auto);
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path.clone()),
+            SaveTiming::Auto,
+        );
 
         app.update();
-
-        // Make the directory read-only so auto-save write fails and emits SaveFailed
-        let original_perms = fs::metadata(dir.path()).unwrap().permissions();
-        let mut read_only_perms = original_perms.clone();
-        read_only_perms.set_readonly(true);
-        fs::set_permissions(dir.path(), read_only_perms).unwrap();
+        fs::create_dir(&path).unwrap();
 
         app.world_mut().resource_mut::<DummySettings>().volume = 0.8;
         app.update();
-
-        // Restore original permissions so tempdir can clean up
-        let _ = fs::set_permissions(dir.path(), original_perms);
 
         let messages = app.world().resource::<Messages<SaveFailed>>();
         assert_eq!(
