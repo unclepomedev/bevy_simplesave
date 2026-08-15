@@ -1,7 +1,7 @@
 use crate::error::SaveError;
 use directories::ProjectDirs;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Where a saved resource's `.ron` file should live on disk.
 #[derive(Debug, Clone)]
@@ -9,7 +9,7 @@ pub enum SaveLocation {
     /// Relative to the directory containing the running executable.
     ExeRelative(PathBuf),
     /// The OS-standard application data directory
-    /// (e.g. `~/.local/share/<app>` on Linux, `%APPDATA%\<org>\<app>` on Windows).
+    /// (e.g. `~/.local/share/<app>` on Linux, `%APPDATA%\<org>\<app>\data` on Windows).
     AppData {
         qualifier: &'static str,
         organization: &'static str,
@@ -18,6 +18,15 @@ pub enum SaveLocation {
     },
     /// Any path chosen by the caller, used as-is.
     Custom(PathBuf),
+}
+
+fn resolve_app_data_dir(dirs: Option<ProjectDirs>, sub: &Path) -> Result<PathBuf, SaveError> {
+    let dirs = dirs.ok_or_else(|| {
+        SaveError::LocationUnavailable(
+            "could not determine a home directory on this platform".into(),
+        )
+    })?;
+    Ok(dirs.data_dir().join(sub))
 }
 
 impl SaveLocation {
@@ -40,13 +49,8 @@ impl SaveLocation {
                 application,
                 sub,
             } => {
-                let dirs =
-                    ProjectDirs::from(qualifier, organization, application).ok_or_else(|| {
-                        SaveError::LocationUnavailable(
-                            "could not determine a home directory on this platform".into(),
-                        )
-                    })?;
-                Ok(dirs.data_dir().join(sub))
+                let dirs = ProjectDirs::from(qualifier, organization, application);
+                resolve_app_data_dir(dirs, sub)
             }
             SaveLocation::Custom(path) => Ok(path.clone()),
         }
@@ -59,6 +63,7 @@ impl SaveLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::assert_matches;
 
     #[test]
     fn custom_returns_path_as_is() {
@@ -81,20 +86,22 @@ mod tests {
     }
 
     #[test]
-    fn app_data_includes_application_name_in_path() {
-        let location = SaveLocation::AppData {
-            qualifier: "dev",
-            organization: "ExampleStudio",
-            application: "ExampleGame",
-            sub: PathBuf::from("settings.ron"),
-        };
-        let resolved = location.resolve().expect("should resolve on CI runners");
+    fn app_data_resolves_to_project_dirs_data_dir_when_available() {
+        let dirs = ProjectDirs::from("dev", "ExampleStudio", "ExampleGame")
+            .expect("this environment must have a resolvable home directory");
+        let sub = PathBuf::from("settings.ron");
 
-        let resolved_str = resolved.to_string_lossy().to_lowercase();
-        assert!(
-            resolved_str.contains("examplegame"),
-            "resolved path `{resolved_str}` should include the application name"
-        );
-        assert!(resolved_str.ends_with("settings.ron"));
+        let resolved = resolve_app_data_dir(Some(dirs.clone()), &sub)
+            .expect("resolve must succeed when ProjectDirs is Some");
+
+        assert_eq!(resolved, dirs.data_dir().join("settings.ron"));
+    }
+
+    #[test]
+    fn app_data_returns_err_when_project_dirs_is_none() {
+        let sub = PathBuf::from("settings.ron");
+        let err = resolve_app_data_dir(None, &sub)
+            .expect_err("resolve must fail when ProjectDirs is None");
+        assert_matches!(err, SaveError::LocationUnavailable(_));
     }
 }
