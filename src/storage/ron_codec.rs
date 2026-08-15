@@ -2,12 +2,10 @@ use crate::error::SaveError;
 use ron::ser::{PrettyConfig, to_string_pretty};
 use serde::{Serialize, de::DeserializeOwned};
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn serialize_to_ron<R: Serialize>(value: &R) -> Result<String, SaveError> {
     to_string_pretty(value, PrettyConfig::default()).map_err(SaveError::Serialize)
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn deserialize_from_ron<R: DeserializeOwned>(s: &str) -> Result<R, SaveError> {
     ron::from_str(s).map_err(SaveError::Deserialize)
 }

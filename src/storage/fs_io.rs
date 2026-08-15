@@ -2,7 +2,6 @@ use crate::error::SaveError;
 use std::fs;
 use std::path::Path;
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), SaveError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| SaveError::Io {
@@ -16,7 +15,6 @@ pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), SaveError> {
     })
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn read_bytes(path: &Path) -> Result<Vec<u8>, SaveError> {
     fs::read(path).map_err(|source| SaveError::Io {
         path: path.to_path_buf(),
