@@ -1,7 +1,7 @@
 use super::SavePath;
 use super::systems::auto_save_system;
 use crate::resource::{load_resource, save_resource};
-use crate::{SaveError, SaveLocation, SaveTiming};
+use crate::{SaveError, SaveFailed, SaveLocation, SaveTiming};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
@@ -60,6 +60,7 @@ impl SaveAppExt for App {
         });
 
         if timing == SaveTiming::Auto {
+            self.add_message::<SaveFailed>();
             self.add_systems(PostUpdate, auto_save_system::<R>);
         }
         self

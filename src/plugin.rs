@@ -6,19 +6,15 @@ mod timing;
 pub use self::app_ext::{SaveAppExt, save_now};
 pub(crate) use self::save_path::SavePath;
 pub use self::timing::SaveTiming;
+use crate::SaveFailed;
 use bevy_app::prelude::*;
 
-/// Adds save/load support to the app. Currently a marker plugin; register
-/// individual resources with [`SaveAppExt::register_saved_resource`].
 #[derive(Default)]
 pub struct SavePlugin;
 
 impl Plugin for SavePlugin {
-    fn build(&self, _app: &mut App) {
-        // Intentionally empty for now. Resources are registered individually
-        // via `SaveAppExt::register_saved_resource`, which does not depend on
-        // this plugin having been added. This exists as a stable extension
-        // point and to match the conventional `add_plugins(...)` pattern.
+    fn build(&self, app: &mut App) {
+        app.add_message::<SaveFailed>();
     }
 }
 
