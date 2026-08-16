@@ -8,7 +8,7 @@ mod storage;
 
 pub use error::SaveError;
 pub use location::SaveLocation;
-pub use messages::SaveFailed;
+pub use messages::{LoadFailed, SaveFailed};
 pub use plugin::{SaveAppExt, SavePlugin, SaveTiming, save_now};
 pub use saveable::Saveable;
 
