@@ -1,12 +1,14 @@
 mod app_ext;
+mod save_now;
 mod save_path;
 mod systems;
 mod timing;
 
-pub use self::app_ext::{SaveAppExt, save_now};
+pub use self::app_ext::SaveAppExt;
+pub use self::save_now::save_now;
 pub(crate) use self::save_path::SavePath;
 pub use self::timing::SaveTiming;
-use crate::SaveFailed;
+use crate::{LoadFailed, SaveFailed};
 use bevy_app::prelude::*;
 
 #[derive(Default)]
@@ -15,6 +17,7 @@ pub struct SavePlugin;
 impl Plugin for SavePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<SaveFailed>();
+        app.add_message::<LoadFailed>();
     }
 }
 
@@ -25,7 +28,6 @@ impl Plugin for SavePlugin {
 mod tests {
     use super::*;
     use crate::SaveLocation;
-    use crate::plugin::app_ext::{SaveAppExt, save_now};
     use bevy_ecs::prelude::*;
     use serde::{Deserialize, Serialize};
     use std::fs;
@@ -40,6 +42,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.ron");
         let mut app = App::new();
+        app.add_plugins(SavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path.clone()),
             SaveTiming::Auto,
@@ -59,6 +62,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.ron");
         let mut app = App::new();
+        app.add_plugins(SavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path.clone()),
             SaveTiming::Manual,
@@ -79,6 +83,7 @@ mod tests {
         fs::write(&path, "(volume: 0.42)").unwrap();
 
         let mut app = App::new();
+        app.add_plugins(SavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path),
             SaveTiming::Manual,
@@ -94,6 +99,7 @@ mod tests {
         let path = dir.path().join("does_not_exist.ron");
 
         let mut app = App::new();
+        app.add_plugins(SavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path),
             SaveTiming::Manual,
@@ -109,6 +115,7 @@ mod tests {
         let path1 = dir.path().join("first.ron");
         let path2 = dir.path().join("second.ron");
         let mut app = App::new();
+        app.add_plugins(SavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path1.clone()),
             SaveTiming::Auto,
@@ -134,6 +141,7 @@ mod tests {
         let path = dir.path().join("save.ron");
 
         let mut app = App::new();
+        app.add_plugins(SavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path.clone()),
             SaveTiming::Auto,
@@ -154,6 +162,19 @@ mod tests {
             messages.len(),
             1,
             "auto_save_system should execute only once"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "SavePlugin` must be added")]
+    fn register_panics_without_save_plugin() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.ron");
+
+        let mut app = App::new();
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path),
+            SaveTiming::Manual,
         );
     }
 }

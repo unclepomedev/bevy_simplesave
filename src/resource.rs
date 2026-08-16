@@ -22,23 +22,22 @@ pub(crate) fn write_resource_ron<R: Serialize>(value: &R, path: &Path) -> Result
     storage::write_bytes(path, ron_str.as_bytes())
 }
 
+/// Returns true if the resource was loaded from the file, false if the file did not exist.
 pub(crate) fn load_resource<R: Resource + DeserializeOwned>(
     world: &mut World,
     path: &Path,
-) -> Result<(), SaveError> {
+) -> Result<bool, SaveError> {
     let bytes = match storage::read_bytes(path) {
         Ok(bytes) => bytes,
         Err(SaveError::Io { source, .. }) if source.kind() == ErrorKind::NotFound => {
-            // No save file yet; leave the world untouched.
-            return Ok(());
+            return Ok(false);
         }
         Err(e) => return Err(e),
     };
-
     let ron_str = String::from_utf8(bytes).map_err(SaveError::InvalidUtf8)?;
     let value: R = storage::deserialize_from_ron(&ron_str)?;
     world.insert_resource(value);
-    Ok(())
+    Ok(true)
 }
 
 // ============================================================================================
@@ -47,11 +46,14 @@ pub(crate) fn load_resource<R: Resource + DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{LoadFailed, SaveAppExt, SaveLocation, SavePlugin, SaveTiming};
+    use bevy_app::App;
+    use bevy_ecs::prelude::Messages;
     use serde::{Deserialize, Serialize};
     use std::assert_matches;
     use std::fs;
 
-    #[derive(Debug, PartialEq, Serialize, Deserialize, Resource)]
+    #[derive(Debug, PartialEq, Serialize, Deserialize, Resource, Default)]
     struct DummySettings {
         volume: f32,
         difficulty: u8,
@@ -118,5 +120,29 @@ mod tests {
         let err = load_resource::<DummySettings>(&mut world, &path)
             .expect_err("corrupt file should be an error");
         assert_matches!(err, SaveError::Deserialize(_));
+    }
+
+    #[test]
+    fn register_emits_load_failed_and_falls_back_to_default_on_corrupt_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.ron");
+        fs::write(&path, b"not valid ron {{{").unwrap();
+
+        let mut app = App::new();
+        app.add_plugins(SavePlugin);
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path),
+            SaveTiming::Manual,
+        );
+
+        let resource = app.world().resource::<DummySettings>();
+        assert_eq!(*resource, DummySettings::default());
+
+        let messages = app.world().resource::<Messages<LoadFailed>>();
+        assert_eq!(
+            messages.len(),
+            1,
+            "corrupt save file should emit LoadFailed"
+        );
     }
 }
