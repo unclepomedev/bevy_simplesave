@@ -164,4 +164,17 @@ mod tests {
             "auto_save_system should execute only once"
         );
     }
+
+    #[test]
+    #[should_panic(expected = "SavePlugin` must be added")]
+    fn register_panics_without_save_plugin() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.ron");
+
+        let mut app = App::new();
+        app.register_saved_resource::<DummySettings>(
+            SaveLocation::Custom(path),
+            SaveTiming::Manual,
+        );
+    }
 }
