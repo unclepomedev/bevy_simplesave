@@ -4,6 +4,7 @@ use crate::group::{ErasedSave, SaveEntry, load_group_bag, save_group_bag};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
+use std::any::type_name;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -28,12 +29,12 @@ impl SaveGroupExt for App {
         if world.get_resource::<R>().is_none() {
             world.insert_resource(R::default());
         }
-        world
-            .get_resource_or_insert_with(GroupMembers::default)
-            .0
-            .entry(group)
-            .or_default()
-            .push(Box::new(SaveEntry::<R>::new()));
+        let mut members = world.get_resource_or_insert_with(GroupMembers::default);
+        let group_entries = members.0.entry(group).or_default();
+        let key = type_name::<R>();
+        if !group_entries.iter().any(|e| e.type_key() == key) {
+            group_entries.push(Box::new(SaveEntry::<R>::new()));
+        }
         self
     }
 }
@@ -125,5 +126,27 @@ mod tests {
 
         assert_eq!(new_app.world().resource::<Position>().x, 7.0);
         assert_eq!(*new_app.world().resource::<Health>(), Health::default());
+    }
+
+    #[test]
+    fn register_same_resource_twice_preserves_loaded_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_duplicate.ron");
+
+        let mut save_app = App::new();
+        save_app.add_plugins(SavePlugin);
+        save_app.register_group_member::<Position>("slot");
+        save_app.register_group_member::<Position>("slot");
+        save_app.world_mut().resource_mut::<Position>().x = 42.0;
+
+        save_group(save_app.world(), "slot", &path).expect("save should succeed");
+
+        let mut load_app = App::new();
+        load_app.add_plugins(SavePlugin);
+        load_app.register_group_member::<Position>("slot");
+        load_app.register_group_member::<Position>("slot");
+        load_group(load_app.world_mut(), "slot", &path).expect("load should succeed");
+
+        assert_eq!(load_app.world().resource::<Position>().x, 42.0);
     }
 }
