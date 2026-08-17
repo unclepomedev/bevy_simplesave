@@ -12,9 +12,16 @@ pub enum SaveWriteError {
         path: PathBuf,
         source: IoError,
     },
-    Serialize(RonError),
-    ResourceMissing(String),
-    UnknownGroup(String),
+    Serialize {
+        resource_type: String,
+        source: RonError,
+    },
+    ResourceMissing {
+        resource_type: String,
+    },
+    UnknownGroup {
+        group: String,
+    },
     /// Should not normally occur.
     Internal(String),
 }
@@ -34,13 +41,19 @@ impl Display for SaveWriteError {
             SaveWriteError::Io { path, source } => {
                 write!(f, "io error at {}: {}", path.display(), source)
             }
-            SaveWriteError::Serialize(e) => write!(f, "failed to serialize to RON: {e}"),
-            SaveWriteError::ResourceMissing(type_name) => {
-                write!(f, "resource `{type_name}` was not found in the world")
+            SaveWriteError::Serialize {
+                resource_type,
+                source,
+            } => write!(f, "failed to serialize `{resource_type}` to RON: {source}"),
+            SaveWriteError::ResourceMissing { resource_type } => {
+                write!(f, "resource `{resource_type}` was not found in the world")
             }
-            SaveWriteError::UnknownGroup(name) => write!(f, "unknown save group: {name}"),
+            SaveWriteError::UnknownGroup { group } => write!(f, "unknown save group: {group}"),
             SaveWriteError::Internal(reason) => {
-                write!(f, "internal error while saving: {reason}")
+                write!(
+                    f,
+                    "internal error while saving (this is likely to be a bug in bevy_simplesave): {reason}"
+                )
             }
         }
     }
@@ -62,5 +75,24 @@ impl Display for SaveReadError {
     }
 }
 
-impl StdError for SaveWriteError {}
-impl StdError for SaveReadError {}
+impl StdError for SaveWriteError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            SaveWriteError::Io { source, .. } => Some(source),
+            SaveWriteError::Serialize { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
+
+impl StdError for SaveReadError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            SaveReadError::Io { source, .. } => Some(source),
+            SaveReadError::Deserialize(source) => Some(source),
+            SaveReadError::InvalidUtf8(source) => Some(source),
+            SaveReadError::GroupMemberDeserialize(source) => Some(source),
+            _ => None,
+        }
+    }
+}

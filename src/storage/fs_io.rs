@@ -98,4 +98,15 @@ mod tests {
         let content = fs::read(&path).unwrap();
         assert_eq!(content, b"new content");
     }
+
+    #[test]
+    fn write_bytes_returns_err_when_parent_path_is_a_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let blocking_file = dir.path().join("not_a_directory");
+        fs::write(&blocking_file, b"i am a file").unwrap();
+
+        let path = blocking_file.join("settings.ron");
+        let result = write_bytes(&path, b"content");
+        assert!(result.is_err(), "should return Err, not panic");
+    }
 }
