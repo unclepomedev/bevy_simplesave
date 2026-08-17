@@ -10,6 +10,17 @@ use std::io::ErrorKind;
 use std::marker::PhantomData;
 use std::path::Path;
 
+/// A marker type identifying a save group. Implement this on an empty
+/// struct to give the group a name at the type level.
+///
+/// ```
+/// use bevy_simplesave::SaveGroup;
+///
+/// struct SlotGroup;
+/// impl SaveGroup for SlotGroup {}
+/// ```
+pub trait SaveGroup: 'static {}
+
 pub(crate) type SaveBag = HashMap<String, RonValue>;
 
 /// A type-erased save/load operation for one resource type within a group.

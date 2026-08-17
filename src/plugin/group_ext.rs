@@ -1,10 +1,10 @@
 use super::ensure_save_plugin_added;
-use crate::group::{ErasedSave, SaveEntry, load_group_bag, save_group_bag};
+use crate::group::{ErasedSave, SaveEntry, SaveGroup, load_group_bag, save_group_bag};
 use crate::{SaveReadError, SaveWriteError};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
-use std::any::type_name;
+use std::any::{TypeId, type_name};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -13,18 +13,21 @@ type GroupMemberList = Vec<Box<dyn ErasedSave>>;
 
 #[derive(Resource, Default)]
 struct GroupMembers {
-    by_group: HashMap<&'static str, GroupMemberList>,
+    by_group: HashMap<TypeId, GroupMemberList>,
 }
 
 pub trait SaveGroupExt {
-    fn register_group_member<R>(&mut self, group: &'static str) -> &mut Self
+    /// Adds `R` as a member of group `G`. Ensures a default value of `R`
+    /// exists in the world immediately; call [`load_group`] to populate it from a file.
+    ///
+    /// Panics if [`crate::SavePlugin`] has not been added to the app.
+    fn register_group_member<G: SaveGroup, R>(&mut self) -> &mut Self
     where
         R: Resource + Serialize + DeserializeOwned + Default;
 }
 
 impl SaveGroupExt for App {
-    /// Panics if [`crate::SavePlugin`] has not been added to the app.
-    fn register_group_member<R>(&mut self, group: &'static str) -> &mut Self
+    fn register_group_member<G: SaveGroup, R>(&mut self) -> &mut Self
     where
         R: Resource + Serialize + DeserializeOwned + Default,
     {
@@ -34,42 +37,47 @@ impl SaveGroupExt for App {
         if world.get_resource::<R>().is_none() {
             world.insert_resource(R::default());
         }
-        let mut members = world.get_resource_or_insert_with(GroupMembers::default);
-        let group_entries = members.by_group.entry(group).or_default();
         let key = type_name::<R>();
-        if !group_entries.iter().any(|e| e.type_key() == key) {
-            group_entries.push(Box::new(SaveEntry::<R>::new()));
+        let mut group_members = world.get_resource_or_insert_with(GroupMembers::default);
+        let members = group_members.by_group.entry(TypeId::of::<G>()).or_default();
+        if !members.iter().any(|e| e.type_key() == key) {
+            members.push(Box::new(SaveEntry::<R>::new()));
         }
         self
     }
 }
 
-/// Saves every resource registered to `group` into a single file at `path`.
-pub fn save_group(world: &World, group: &'static str, path: &Path) -> Result<(), SaveWriteError> {
+/// Saves every resource registered to group `G` into a single file at `path`.
+pub fn save_group<G: SaveGroup>(
+    world: &World,
+    path: impl AsRef<Path>,
+) -> Result<(), SaveWriteError> {
     let entries = world
         .get_resource::<GroupMembers>()
-        .and_then(|m| m.by_group.get(group))
+        .and_then(|m| m.by_group.get(&TypeId::of::<G>()))
         .ok_or_else(|| SaveWriteError::UnknownGroup {
-            group: group.to_string(),
+            group: type_name::<G>().to_string(),
         })?;
-    save_group_bag(world, entries, path)
+    save_group_bag(world, entries, path.as_ref())
 }
 
-/// Loads every resource registered to `group` from a single file at `path`.
-pub fn load_group(
+/// Loads every resource registered to group `G` from a single file at `path`.
+pub fn load_group<G: SaveGroup>(
     world: &mut World,
-    group: &'static str,
-    path: &Path,
+    path: impl AsRef<Path>,
 ) -> Result<(), SaveReadError> {
     if !world.contains_resource::<GroupMembers>() {
-        return Err(SaveReadError::UnknownGroup(group.to_string()));
+        return Err(SaveReadError::UnknownGroup {
+            group: type_name::<G>().to_string(),
+        });
     }
     world.resource_scope(|world, members: Mut<GroupMembers>| {
-        let entries = members
-            .by_group
-            .get(group)
-            .ok_or_else(|| SaveReadError::UnknownGroup(group.to_string()))?;
-        load_group_bag(world, entries, path)
+        let entries = members.by_group.get(&TypeId::of::<G>()).ok_or_else(|| {
+            SaveReadError::UnknownGroup {
+                group: type_name::<G>().to_string(),
+            }
+        })?;
+        load_group_bag(world, entries, path.as_ref())
     })
 }
 
@@ -83,6 +91,9 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::assert_matches;
     use std::fs;
+
+    struct SlotGroup;
+    impl SaveGroup for SlotGroup {}
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Resource, Default)]
     struct Position {
@@ -101,18 +112,18 @@ mod tests {
 
         let mut save_app = App::new();
         save_app.add_plugins(SavePlugin);
-        save_app.register_group_member::<Position>("slot");
-        save_app.register_group_member::<Health>("slot");
+        save_app.register_group_member::<SlotGroup, Position>();
+        save_app.register_group_member::<SlotGroup, Health>();
         save_app.world_mut().resource_mut::<Position>().x = 3.0;
         save_app.world_mut().resource_mut::<Health>().hp = 42;
 
-        save_group(save_app.world(), "slot", &path).expect("save should succeed");
+        save_group::<SlotGroup>(save_app.world(), &path).expect("save should succeed");
 
         let mut load_app = App::new();
         load_app.add_plugins(SavePlugin);
-        load_app.register_group_member::<Position>("slot");
-        load_app.register_group_member::<Health>("slot");
-        load_group(load_app.world_mut(), "slot", &path).expect("load should succeed");
+        load_app.register_group_member::<SlotGroup, Position>();
+        load_app.register_group_member::<SlotGroup, Health>();
+        load_group::<SlotGroup>(load_app.world_mut(), &path).expect("load should succeed");
 
         assert_eq!(load_app.world().resource::<Position>().x, 3.0);
         assert_eq!(load_app.world().resource::<Health>().hp, 42);
@@ -126,16 +137,16 @@ mod tests {
         // Old save: only Position was known at the time.
         let mut old_app = App::new();
         old_app.add_plugins(SavePlugin);
-        old_app.register_group_member::<Position>("slot");
+        old_app.register_group_member::<SlotGroup, Position>();
         old_app.world_mut().resource_mut::<Position>().x = 7.0;
-        save_group(old_app.world(), "slot", &path).unwrap();
+        save_group::<SlotGroup>(old_app.world(), &path).unwrap();
 
         // Newer build adds Health to the group.
         let mut new_app = App::new();
         new_app.add_plugins(SavePlugin);
-        new_app.register_group_member::<Position>("slot");
-        new_app.register_group_member::<Health>("slot");
-        load_group(new_app.world_mut(), "slot", &path).expect("load should succeed");
+        new_app.register_group_member::<SlotGroup, Position>();
+        new_app.register_group_member::<SlotGroup, Health>();
+        load_group::<SlotGroup>(new_app.world_mut(), &path).expect("load should succeed");
 
         assert_eq!(new_app.world().resource::<Position>().x, 7.0);
         assert_eq!(*new_app.world().resource::<Health>(), Health::default());
@@ -148,17 +159,17 @@ mod tests {
 
         let mut save_app = App::new();
         save_app.add_plugins(SavePlugin);
-        save_app.register_group_member::<Position>("slot");
-        save_app.register_group_member::<Position>("slot");
+        save_app.register_group_member::<SlotGroup, Position>();
+        save_app.register_group_member::<SlotGroup, Position>();
         save_app.world_mut().resource_mut::<Position>().x = 42.0;
 
-        save_group(save_app.world(), "slot", &path).expect("save should succeed");
+        save_group::<SlotGroup>(save_app.world(), &path).expect("save should succeed");
 
         let mut load_app = App::new();
         load_app.add_plugins(SavePlugin);
-        load_app.register_group_member::<Position>("slot");
-        load_app.register_group_member::<Position>("slot");
-        load_group(load_app.world_mut(), "slot", &path).expect("load should succeed");
+        load_app.register_group_member::<SlotGroup, Position>();
+        load_app.register_group_member::<SlotGroup, Position>();
+        load_group::<SlotGroup>(load_app.world_mut(), &path).expect("load should succeed");
 
         assert_eq!(load_app.world().resource::<Position>().x, 42.0);
     }
@@ -171,9 +182,9 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins(SavePlugin);
-        app.register_group_member::<Position>("slot");
+        app.register_group_member::<SlotGroup, Position>();
 
-        let err = load_group(app.world_mut(), "slot", &path)
+        let err = load_group::<SlotGroup>(app.world_mut(), &path)
             .expect_err("corrupt bag file should be an error");
         assert_matches!(err, SaveReadError::Deserialize(_));
     }
@@ -191,10 +202,10 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins(SavePlugin);
-        app.register_group_member::<Position>("slot");
-        app.register_group_member::<Health>("slot");
+        app.register_group_member::<SlotGroup, Position>();
+        app.register_group_member::<SlotGroup, Health>();
 
-        load_group(app.world_mut(), "slot", &path).expect("load should succeed overall");
+        load_group::<SlotGroup>(app.world_mut(), &path).expect("load should succeed overall");
 
         assert_eq!(*app.world().resource::<Position>(), Position::default());
         assert_eq!(app.world().resource::<Health>().hp, 42);
@@ -217,10 +228,10 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins(SavePlugin);
-        app.register_group_member::<Position>("slot");
+        app.register_group_member::<SlotGroup, Position>();
         app.world_mut().remove_resource::<Position>();
 
-        let err = save_group(app.world(), "slot", &path)
+        let err = save_group::<SlotGroup>(app.world(), &path)
             .expect_err("save should fail when a member resource is missing");
         assert_matches!(err, SaveWriteError::ResourceMissing { .. });
         assert!(!path.exists(), "no partial file should be written");
