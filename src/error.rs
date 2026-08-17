@@ -32,7 +32,7 @@ pub enum SaveReadError {
     Deserialize(SpannedError),
     InvalidUtf8(FromUtf8Error),
     GroupMemberDeserialize(RonError),
-    UnknownGroup(String),
+    UnknownGroup { group: String },
 }
 
 impl Display for SaveWriteError {
@@ -70,7 +70,7 @@ impl Display for SaveReadError {
             SaveReadError::GroupMemberDeserialize(e) => {
                 write!(f, "failed to deserialize group member from RON: {e}")
             }
-            SaveReadError::UnknownGroup(name) => write!(f, "unknown save group: {name}"),
+            SaveReadError::UnknownGroup { group: name } => write!(f, "unknown save group: {name}"),
         }
     }
 }

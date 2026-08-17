@@ -8,6 +8,7 @@ mod saveable;
 mod storage;
 
 pub use error::{SaveReadError, SaveWriteError};
+pub use group::SaveGroup;
 pub use location::SaveLocation;
 pub use messages::{LoadFailed, SaveFailed};
 pub use plugin::{
