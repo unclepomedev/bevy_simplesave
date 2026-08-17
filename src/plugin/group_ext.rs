@@ -8,8 +8,13 @@ use std::any::type_name;
 use std::collections::HashMap;
 use std::path::Path;
 
+/// The set of resource types registered to a single named group.
+type GroupMemberList = Vec<Box<dyn ErasedSave>>;
+
 #[derive(Resource, Default)]
-struct GroupMembers(HashMap<&'static str, Vec<Box<dyn ErasedSave>>>);
+struct GroupMembers {
+    by_group: HashMap<&'static str, GroupMemberList>,
+}
 
 pub trait SaveGroupExt {
     fn register_group_member<R>(&mut self, group: &'static str) -> &mut Self
@@ -30,7 +35,7 @@ impl SaveGroupExt for App {
             world.insert_resource(R::default());
         }
         let mut members = world.get_resource_or_insert_with(GroupMembers::default);
-        let group_entries = members.0.entry(group).or_default();
+        let group_entries = members.by_group.entry(group).or_default();
         let key = type_name::<R>();
         if !group_entries.iter().any(|e| e.type_key() == key) {
             group_entries.push(Box::new(SaveEntry::<R>::new()));
@@ -43,7 +48,7 @@ impl SaveGroupExt for App {
 pub fn save_group(world: &World, group: &'static str, path: &Path) -> Result<(), SaveWriteError> {
     let entries = world
         .get_resource::<GroupMembers>()
-        .and_then(|m| m.0.get(group))
+        .and_then(|m| m.by_group.get(group))
         .ok_or_else(|| SaveWriteError::UnknownGroup {
             group: group.to_string(),
         })?;
@@ -61,7 +66,7 @@ pub fn load_group(
     }
     world.resource_scope(|world, members: Mut<GroupMembers>| {
         let entries = members
-            .0
+            .by_group
             .get(group)
             .ok_or_else(|| SaveReadError::UnknownGroup(group.to_string()))?;
         load_group_bag(world, entries, path)
