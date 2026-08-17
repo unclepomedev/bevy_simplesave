@@ -14,7 +14,9 @@ pub(crate) fn save_resource<R: Resource + Serialize>(
 ) -> Result<(), SaveWriteError> {
     let resource = world
         .get_resource::<R>()
-        .ok_or_else(|| SaveWriteError::ResourceMissing(type_name::<R>().to_string()))?;
+        .ok_or_else(|| SaveWriteError::ResourceMissing {
+            resource_type: type_name::<R>().to_string(),
+        })?;
     write_resource_ron(resource, path)
 }
 
@@ -22,8 +24,8 @@ pub(crate) fn write_resource_ron<R: Serialize>(
     value: &R,
     path: &Path,
 ) -> Result<(), SaveWriteError> {
-    let ron_str = storage::serialize_to_ron(value).map_err(write_err)?;
-    storage::write_bytes(path, ron_str.as_bytes()).map_err(write_err)
+    let ron_str = storage::serialize_to_ron(value).map_err(write_err::<R>)?;
+    storage::write_bytes(path, ron_str.as_bytes()).map_err(write_err::<R>)
 }
 
 /// Returns true if the resource was loaded from the file, false if the file did not exist.
@@ -44,10 +46,13 @@ pub(crate) fn load_resource<R: Resource + DeserializeOwned>(
     Ok(true)
 }
 
-fn write_err(e: StorageError) -> SaveWriteError {
+fn write_err<R>(e: StorageError) -> SaveWriteError {
     match e {
         StorageError::Io { path, source } => SaveWriteError::Io { path, source },
-        StorageError::Serialize(e) => SaveWriteError::Serialize(e),
+        StorageError::Serialize(source) => SaveWriteError::Serialize {
+            resource_type: type_name::<R>().to_string(),
+            source,
+        },
         StorageError::Deserialize(_) => unreachable!("write path never deserializes"),
     }
 }
@@ -115,7 +120,7 @@ mod tests {
         let world = World::new(); // DummySettings not inserted
         let err = save_resource::<DummySettings>(&world, &path)
             .expect_err("save should fail when resource is missing");
-        assert_matches!(err, SaveWriteError::ResourceMissing(_));
+        assert_matches!(err, SaveWriteError::ResourceMissing { .. });
     }
 
     #[test]

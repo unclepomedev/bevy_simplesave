@@ -36,11 +36,17 @@ where
     }
 
     fn extract(&self, world: &World) -> Result<RonValue, SaveWriteError> {
-        let resource = world
-            .get_resource::<R>()
-            .ok_or_else(|| SaveWriteError::ResourceMissing(type_name::<R>().to_string()))?;
+        let resource =
+            world
+                .get_resource::<R>()
+                .ok_or_else(|| SaveWriteError::ResourceMissing {
+                    resource_type: type_name::<R>().to_string(),
+                })?;
         let ron_str = storage::serialize_to_ron(resource).map_err(|e| match e {
-            StorageError::Serialize(e) => SaveWriteError::Serialize(e),
+            StorageError::Serialize(e) => SaveWriteError::Serialize {
+                resource_type: type_name::<R>().to_string(),
+                source: e,
+            },
             other => SaveWriteError::Internal(format!("{}: {other}", type_name::<R>())),
         })?;
         storage::deserialize_from_ron::<RonValue>(&ron_str).map_err(|e| {
@@ -84,7 +90,10 @@ pub(crate) fn save_group_bag(
         bag.insert(entry.type_key().to_string(), entry.extract(world)?);
     }
     let ron_str = storage::serialize_to_ron(&bag).map_err(|e| match e {
-        StorageError::Serialize(e) => SaveWriteError::Serialize(e),
+        StorageError::Serialize(e) => SaveWriteError::Serialize {
+            resource_type: "SaveBag".to_string(),
+            source: e,
+        },
         other => SaveWriteError::Internal(other.to_string()),
     })?;
     storage::write_bytes(path, ron_str.as_bytes()).map_err(|e| match e {

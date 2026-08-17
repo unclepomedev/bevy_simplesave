@@ -44,7 +44,9 @@ pub fn save_group(world: &World, group: &'static str, path: &Path) -> Result<(),
     let entries = world
         .get_resource::<GroupMembers>()
         .and_then(|m| m.0.get(group))
-        .ok_or_else(|| SaveWriteError::UnknownGroup(group.to_string()))?;
+        .ok_or_else(|| SaveWriteError::UnknownGroup {
+            group: group.to_string(),
+        })?;
     save_group_bag(world, entries, path)
 }
 
@@ -215,7 +217,19 @@ mod tests {
 
         let err = save_group(app.world(), "slot", &path)
             .expect_err("save should fail when a member resource is missing");
-        assert_matches!(err, SaveWriteError::ResourceMissing(_));
+        assert_matches!(err, SaveWriteError::ResourceMissing { .. });
         assert!(!path.exists(), "no partial file should be written");
+    }
+
+    #[test]
+    fn save_write_error_serialize_display_formats_resource_type_and_source() {
+        let err = SaveWriteError::Serialize {
+            resource_type: "MyResource".to_string(),
+            source: ron::Error::Message("custom ron error".to_string()),
+        };
+        assert_eq!(
+            err.to_string(),
+            "failed to serialize `MyResource` to RON: custom ron error"
+        );
     }
 }
