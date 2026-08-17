@@ -40,7 +40,10 @@ impl Display for SaveWriteError {
             }
             SaveWriteError::UnknownGroup(name) => write!(f, "unknown save group: {name}"),
             SaveWriteError::Internal(reason) => {
-                write!(f, "internal error while saving: {reason}")
+                write!(
+                    f,
+                    "internal error while saving (this is likely to be a bug in bevy_simplesave): {reason}"
+                )
             }
         }
     }

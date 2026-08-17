@@ -41,10 +41,14 @@ where
             .ok_or_else(|| SaveWriteError::ResourceMissing(type_name::<R>().to_string()))?;
         let ron_str = storage::serialize_to_ron(resource).map_err(|e| match e {
             StorageError::Serialize(e) => SaveWriteError::Serialize(e),
-            other => SaveWriteError::Internal(other.to_string()),
+            other => SaveWriteError::Internal(format!("{}: {other}", type_name::<R>())),
         })?;
-        storage::deserialize_from_ron::<RonValue>(&ron_str)
-            .map_err(|e| SaveWriteError::Internal(e.to_string()))
+        storage::deserialize_from_ron::<RonValue>(&ron_str).map_err(|e| {
+            SaveWriteError::Internal(format!(
+                "re-parsing RON produced for `{}` failed: {e}",
+                type_name::<R>()
+            ))
+        })
     }
 
     /// - Key absent from the file falls back to `Default`.

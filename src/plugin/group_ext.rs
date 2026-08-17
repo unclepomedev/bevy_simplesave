@@ -72,8 +72,10 @@ pub fn load_group(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SavePlugin;
+    use crate::{LoadFailed, SavePlugin};
     use serde::{Deserialize, Serialize};
+    use std::assert_matches;
+    use std::fs;
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Resource, Default)]
     struct Position {
@@ -152,5 +154,65 @@ mod tests {
         load_group(load_app.world_mut(), "slot", &path).expect("load should succeed");
 
         assert_eq!(load_app.world().resource::<Position>().x, 42.0);
+    }
+
+    #[test]
+    fn load_group_propagates_error_for_corrupt_bag_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+        fs::write(&path, b"not valid ron {{{").unwrap();
+
+        let mut app = App::new();
+        app.add_plugins(SavePlugin);
+        app.register_group_member::<Position>("slot");
+
+        let err = load_group(app.world_mut(), "slot", &path)
+            .expect_err("corrupt bag file should be an error");
+        assert_matches!(err, SaveReadError::Deserialize(_));
+    }
+
+    #[test]
+    fn load_group_defaults_one_corrupt_member_but_loads_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let position_key = type_name::<Position>();
+        let health_key = type_name::<Health>();
+        let bag_ron =
+            format!(r#"{{"{position_key}": (x: "not_a_number"), "{health_key}": (hp: 42)}}"#);
+        fs::write(&path, bag_ron).unwrap();
+
+        let mut app = App::new();
+        app.add_plugins(SavePlugin);
+        app.register_group_member::<Position>("slot");
+        app.register_group_member::<Health>("slot");
+
+        load_group(app.world_mut(), "slot", &path).expect("load should succeed overall");
+
+        assert_eq!(*app.world().resource::<Position>(), Position::default());
+        assert_eq!(app.world().resource::<Health>().hp, 42);
+
+        let messages = app.world().resource::<Messages<LoadFailed>>();
+        assert_eq!(
+            messages.len(),
+            1,
+            "corrupt member should emit exactly one LoadFailed"
+        );
+    }
+
+    #[test]
+    fn save_group_errors_when_a_member_resource_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let mut app = App::new();
+        app.add_plugins(SavePlugin);
+        app.register_group_member::<Position>("slot");
+        app.world_mut().remove_resource::<Position>();
+
+        let err = save_group(app.world(), "slot", &path)
+            .expect_err("save should fail when a member resource is missing");
+        assert_matches!(err, SaveWriteError::ResourceMissing(_));
+        assert!(!path.exists(), "no partial file should be written");
     }
 }
