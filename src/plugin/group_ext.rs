@@ -198,6 +198,9 @@ mod tests {
             1,
             "corrupt member should emit exactly one LoadFailed"
         );
+        let msg = messages.iter_current_update_messages().next().unwrap();
+        assert_eq!(msg.resource_type, type_name::<Position>());
+        assert_matches!(msg.error, SaveReadError::GroupMemberDeserialize(_));
     }
 
     #[test]
