@@ -5,6 +5,7 @@ use std::io::Error as IoError;
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 
+// TODO: split / organize
 #[derive(Debug)]
 pub enum SaveError {
     Io { path: PathBuf, source: IoError },
@@ -14,6 +15,8 @@ pub enum SaveError {
     InvalidSubPath(PathBuf),
     ResourceMissing(String),
     InvalidUtf8(FromUtf8Error),
+    GroupMemberDeserialize(RonError),
+    UnknownGroup(String),
 }
 
 impl Display for SaveError {
@@ -39,6 +42,12 @@ impl Display for SaveError {
             }
             SaveError::InvalidUtf8(e) => {
                 write!(f, "saved file is not valid UTF-8: {e}")
+            }
+            SaveError::GroupMemberDeserialize(e) => {
+                write!(f, "failed to deserialize group member from RON: {e}")
+            }
+            SaveError::UnknownGroup(name) => {
+                write!(f, "unknown save group: {name}")
             }
         }
     }

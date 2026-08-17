@@ -1,7 +1,7 @@
-use super::SavePath;
 use super::systems::auto_save_system;
+use super::{SavePath, ensure_save_plugin_added};
 use crate::resource::load_resource;
-use crate::{LoadFailed, SaveFailed, SaveLocation, SaveTiming, Saveable};
+use crate::{LoadFailed, SaveLocation, SaveTiming, Saveable};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
@@ -85,14 +85,4 @@ fn claim_auto_save_registration<R: Resource>(world: &mut World, timing: SaveTimi
         world.insert_resource(AutoSaveRegistered::<R>(PhantomData));
     }
     needed
-}
-
-fn ensure_save_plugin_added(world: &World) {
-    assert!(
-        world.contains_resource::<Messages<SaveFailed>>()
-            && world.contains_resource::<Messages<LoadFailed>>(),
-        "bevy_simplesave: `SavePlugin` must be added to the app \
-         (e.g. `app.add_plugins(SavePlugin)`) before calling any \
-         `bevy_simplesave` registration or save/load function"
-    );
 }
