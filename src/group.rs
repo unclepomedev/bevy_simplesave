@@ -1,5 +1,5 @@
 use crate::error::SaveError;
-use crate::storage;
+use crate::{LoadFailed, storage};
 use bevy_ecs::resource::Resource;
 use bevy_ecs::world::World;
 use ron::Value as RonValue;
@@ -53,7 +53,7 @@ where
                 }
                 Err(e) => {
                     world.insert_resource(R::default());
-                    world.write_message(crate::LoadFailed {
+                    world.write_message(LoadFailed {
                         resource_type: type_name::<R>(),
                         error: SaveError::GroupMemberDeserialize(e),
                     });
