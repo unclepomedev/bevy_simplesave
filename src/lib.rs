@@ -7,7 +7,7 @@ mod resource;
 mod saveable;
 mod storage;
 
-pub use error::SaveError;
+pub use error::{SaveReadError, SaveWriteError};
 pub use location::SaveLocation;
 pub use messages::{LoadFailed, SaveFailed};
 pub use plugin::{

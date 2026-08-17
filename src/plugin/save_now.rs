@@ -1,4 +1,4 @@
-use crate::SaveError;
+use crate::SaveWriteError;
 use crate::plugin::SavePath;
 use crate::resource::save_resource;
 use bevy_ecs::error::Result;
@@ -8,9 +8,9 @@ use std::any::type_name;
 
 /// Explicitly saves a resource registered with [`SaveTiming::Manual`]
 /// or force-saves one registered with [`SaveTiming::Auto`].
-pub fn save_now<R: Resource + Serialize>(world: &World) -> Result<(), SaveError> {
+pub fn save_now<R: Resource + Serialize>(world: &World) -> Result<(), SaveWriteError> {
     let path = world
         .get_resource::<SavePath<R>>()
-        .ok_or_else(|| SaveError::ResourceMissing(type_name::<SavePath<R>>().to_string()))?;
+        .ok_or_else(|| SaveWriteError::ResourceMissing(type_name::<SavePath<R>>().to_string()))?;
     save_resource::<R>(world, &path.path_buf.clone())
 }

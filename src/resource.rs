@@ -1,5 +1,6 @@
-use crate::error::SaveError;
 use crate::storage;
+use crate::storage::StorageError;
+use crate::{SaveReadError, SaveWriteError};
 use bevy_ecs::resource::Resource;
 use bevy_ecs::world::World;
 use serde::{Serialize, de::DeserializeOwned};
@@ -10,34 +11,53 @@ use std::path::Path;
 pub(crate) fn save_resource<R: Resource + Serialize>(
     world: &World,
     path: &Path,
-) -> Result<(), SaveError> {
+) -> Result<(), SaveWriteError> {
     let resource = world
         .get_resource::<R>()
-        .ok_or_else(|| SaveError::ResourceMissing(type_name::<R>().to_string()))?;
+        .ok_or_else(|| SaveWriteError::ResourceMissing(type_name::<R>().to_string()))?;
     write_resource_ron(resource, path)
 }
 
-pub(crate) fn write_resource_ron<R: Serialize>(value: &R, path: &Path) -> Result<(), SaveError> {
-    let ron_str = storage::serialize_to_ron(value)?;
-    storage::write_bytes(path, ron_str.as_bytes())
+pub(crate) fn write_resource_ron<R: Serialize>(
+    value: &R,
+    path: &Path,
+) -> Result<(), SaveWriteError> {
+    let ron_str = storage::serialize_to_ron(value).map_err(write_err)?;
+    storage::write_bytes(path, ron_str.as_bytes()).map_err(write_err)
 }
 
 /// Returns true if the resource was loaded from the file, false if the file did not exist.
 pub(crate) fn load_resource<R: Resource + DeserializeOwned>(
     world: &mut World,
     path: &Path,
-) -> Result<bool, SaveError> {
+) -> Result<bool, SaveReadError> {
     let bytes = match storage::read_bytes(path) {
         Ok(bytes) => bytes,
-        Err(SaveError::Io { source, .. }) if source.kind() == ErrorKind::NotFound => {
+        Err(StorageError::Io { source, .. }) if source.kind() == ErrorKind::NotFound => {
             return Ok(false);
         }
-        Err(e) => return Err(e),
+        Err(e) => return Err(read_err(e)),
     };
-    let ron_str = String::from_utf8(bytes).map_err(SaveError::InvalidUtf8)?;
-    let value: R = storage::deserialize_from_ron(&ron_str)?;
+    let ron_str = String::from_utf8(bytes).map_err(SaveReadError::InvalidUtf8)?;
+    let value: R = storage::deserialize_from_ron(&ron_str).map_err(read_err)?;
     world.insert_resource(value);
     Ok(true)
+}
+
+fn write_err(e: StorageError) -> SaveWriteError {
+    match e {
+        StorageError::Io { path, source } => SaveWriteError::Io { path, source },
+        StorageError::Serialize(e) => SaveWriteError::Serialize(e),
+        StorageError::Deserialize(_) => unreachable!("write path never deserializes"),
+    }
+}
+
+fn read_err(e: StorageError) -> SaveReadError {
+    match e {
+        StorageError::Io { path, source } => SaveReadError::Io { path, source },
+        StorageError::Deserialize(e) => SaveReadError::Deserialize(e),
+        StorageError::Serialize(_) => unreachable!("read path never serializes"),
+    }
 }
 
 // ============================================================================================
@@ -95,7 +115,7 @@ mod tests {
         let world = World::new(); // DummySettings not inserted
         let err = save_resource::<DummySettings>(&world, &path)
             .expect_err("save should fail when resource is missing");
-        assert_matches!(err, SaveError::ResourceMissing(_));
+        assert_matches!(err, SaveWriteError::ResourceMissing(_));
     }
 
     #[test]
@@ -119,7 +139,7 @@ mod tests {
         let mut world = World::new();
         let err = load_resource::<DummySettings>(&mut world, &path)
             .expect_err("corrupt file should be an error");
-        assert_matches!(err, SaveError::Deserialize(_));
+        assert_matches!(err, SaveReadError::Deserialize(_));
     }
 
     #[test]

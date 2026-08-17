@@ -1,5 +1,5 @@
-use crate::error::SaveError;
-use crate::{LoadFailed, storage};
+use crate::storage::StorageError;
+use crate::{LoadFailed, SaveReadError, SaveWriteError, storage};
 use bevy_ecs::resource::Resource;
 use bevy_ecs::world::World;
 use ron::Value as RonValue;
@@ -15,7 +15,7 @@ pub(crate) type SaveBag = HashMap<String, RonValue>;
 /// A type-erased save/load operation for one resource type within a group.
 pub(crate) trait ErasedSave: Send + Sync + 'static {
     fn type_key(&self) -> &'static str;
-    fn extract(&self, world: &World) -> Result<RonValue, SaveError>;
+    fn extract(&self, world: &World) -> Result<RonValue, SaveWriteError>;
     fn apply(&self, world: &mut World, value: Option<RonValue>);
 }
 
@@ -35,12 +35,16 @@ where
         type_name::<R>()
     }
 
-    fn extract(&self, world: &World) -> Result<RonValue, SaveError> {
+    fn extract(&self, world: &World) -> Result<RonValue, SaveWriteError> {
         let resource = world
             .get_resource::<R>()
-            .ok_or_else(|| SaveError::ResourceMissing(type_name::<R>().to_string()))?;
-        let ron_str = storage::serialize_to_ron(resource)?;
+            .ok_or_else(|| SaveWriteError::ResourceMissing(type_name::<R>().to_string()))?;
+        let ron_str = storage::serialize_to_ron(resource).map_err(|e| match e {
+            StorageError::Serialize(e) => SaveWriteError::Serialize(e),
+            other => SaveWriteError::Internal(other.to_string()),
+        })?;
         storage::deserialize_from_ron::<RonValue>(&ron_str)
+            .map_err(|e| SaveWriteError::Internal(e.to_string()))
     }
 
     /// - Key absent from the file falls back to `Default`.
@@ -55,7 +59,7 @@ where
                     world.insert_resource(R::default());
                     world.write_message(LoadFailed {
                         resource_type: type_name::<R>(),
-                        error: SaveError::GroupMemberDeserialize(e),
+                        error: SaveReadError::GroupMemberDeserialize(e),
                     });
                 }
             },
@@ -70,33 +74,47 @@ pub(crate) fn save_group_bag(
     world: &World,
     entries: &[Box<dyn ErasedSave>],
     path: &Path,
-) -> Result<(), SaveError> {
+) -> Result<(), SaveWriteError> {
     let mut bag = SaveBag::new();
     for entry in entries {
         bag.insert(entry.type_key().to_string(), entry.extract(world)?);
     }
-    let ron_str = storage::serialize_to_ron(&bag)?;
-    storage::write_bytes(path, ron_str.as_bytes())
+    let ron_str = storage::serialize_to_ron(&bag).map_err(|e| match e {
+        StorageError::Serialize(e) => SaveWriteError::Serialize(e),
+        other => SaveWriteError::Internal(other.to_string()),
+    })?;
+    storage::write_bytes(path, ron_str.as_bytes()).map_err(|e| match e {
+        StorageError::Io { path, source } => SaveWriteError::Io { path, source },
+        other => SaveWriteError::Internal(other.to_string()),
+    })
 }
 
 pub(crate) fn load_group_bag(
     world: &mut World,
     entries: &[Box<dyn ErasedSave>],
     path: &Path,
-) -> Result<(), SaveError> {
+) -> Result<(), SaveReadError> {
     let bytes = match storage::read_bytes(path) {
         Ok(bytes) => bytes,
-        Err(SaveError::Io { source, .. }) if source.kind() == ErrorKind::NotFound => {
+        Err(StorageError::Io { source, .. }) if source.kind() == ErrorKind::NotFound => {
             for entry in entries {
                 entry.apply(world, None);
             }
             return Ok(());
         }
-        Err(e) => return Err(e),
+        Err(e) => {
+            return Err(match e {
+                StorageError::Io { path, source } => SaveReadError::Io { path, source },
+                other => unreachable!("read_bytes only returns Io errors: {other}"),
+            });
+        }
     };
 
-    let ron_str = String::from_utf8(bytes).map_err(SaveError::InvalidUtf8)?;
-    let mut bag: SaveBag = storage::deserialize_from_ron(&ron_str)?;
+    let ron_str = String::from_utf8(bytes).map_err(SaveReadError::InvalidUtf8)?;
+    let mut bag: SaveBag = storage::deserialize_from_ron(&ron_str).map_err(|e| match e {
+        StorageError::Deserialize(e) => SaveReadError::Deserialize(e),
+        other => unreachable!("deserialize_from_ron only returns Deserialize errors: {other}"),
+    })?;
 
     for entry in entries {
         let value = bag.remove(entry.type_key());

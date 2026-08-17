@@ -1,6 +1,6 @@
 use super::ensure_save_plugin_added;
-use crate::SaveError;
 use crate::group::{ErasedSave, SaveEntry, load_group_bag, save_group_bag};
+use crate::{SaveReadError, SaveWriteError};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
@@ -40,24 +40,28 @@ impl SaveGroupExt for App {
 }
 
 /// Saves every resource registered to `group` into a single file at `path`.
-pub fn save_group(world: &World, group: &'static str, path: &Path) -> Result<(), SaveError> {
+pub fn save_group(world: &World, group: &'static str, path: &Path) -> Result<(), SaveWriteError> {
     let entries = world
         .get_resource::<GroupMembers>()
         .and_then(|m| m.0.get(group))
-        .ok_or_else(|| SaveError::UnknownGroup(group.to_string()))?;
+        .ok_or_else(|| SaveWriteError::UnknownGroup(group.to_string()))?;
     save_group_bag(world, entries, path)
 }
 
 /// Loads every resource registered to `group` from a single file at `path`.
-pub fn load_group(world: &mut World, group: &'static str, path: &Path) -> Result<(), SaveError> {
+pub fn load_group(
+    world: &mut World,
+    group: &'static str,
+    path: &Path,
+) -> Result<(), SaveReadError> {
     if !world.contains_resource::<GroupMembers>() {
-        return Err(SaveError::UnknownGroup(group.to_string()));
+        return Err(SaveReadError::UnknownGroup(group.to_string()));
     }
     world.resource_scope(|world, members: Mut<GroupMembers>| {
         let entries = members
             .0
             .get(group)
-            .ok_or_else(|| SaveError::UnknownGroup(group.to_string()))?;
+            .ok_or_else(|| SaveReadError::UnknownGroup(group.to_string()))?;
         load_group_bag(world, entries, path)
     })
 }

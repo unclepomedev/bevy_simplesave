@@ -1,56 +1,66 @@
-use ron::{Error as RonError, error::SpannedError};
+use ron::Error as RonError;
+use ron::error::SpannedError;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IoError;
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 
-// TODO: split / organize
 #[derive(Debug)]
-pub enum SaveError {
-    Io { path: PathBuf, source: IoError },
+pub enum SaveWriteError {
+    Io {
+        path: PathBuf,
+        source: IoError,
+    },
     Serialize(RonError),
-    Deserialize(SpannedError),
-    LocationUnavailable(String),
-    InvalidSubPath(PathBuf),
     ResourceMissing(String),
+    UnknownGroup(String),
+    /// Should not normally occur.
+    Internal(String),
+}
+
+#[derive(Debug)]
+pub enum SaveReadError {
+    Io { path: PathBuf, source: IoError },
+    Deserialize(SpannedError),
     InvalidUtf8(FromUtf8Error),
     GroupMemberDeserialize(RonError),
     UnknownGroup(String),
 }
 
-impl Display for SaveError {
+impl Display for SaveWriteError {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            SaveError::Io { path, source } => {
+            SaveWriteError::Io { path, source } => {
                 write!(f, "io error at {}: {}", path.display(), source)
             }
-            SaveError::Serialize(e) => write!(f, "failed to serialize to RON: {e}"),
-            SaveError::Deserialize(e) => write!(f, "failed to deserialize from RON: {e}"),
-            SaveError::LocationUnavailable(reason) => {
-                write!(f, "could not resolve save location: {reason}")
-            }
-            SaveError::InvalidSubPath(path) => {
-                write!(
-                    f,
-                    "sub path `{}` must be relative (no root or drive prefix)",
-                    path.display()
-                )
-            }
-            SaveError::ResourceMissing(type_name) => {
+            SaveWriteError::Serialize(e) => write!(f, "failed to serialize to RON: {e}"),
+            SaveWriteError::ResourceMissing(type_name) => {
                 write!(f, "resource `{type_name}` was not found in the world")
             }
-            SaveError::InvalidUtf8(e) => {
-                write!(f, "saved file is not valid UTF-8: {e}")
-            }
-            SaveError::GroupMemberDeserialize(e) => {
-                write!(f, "failed to deserialize group member from RON: {e}")
-            }
-            SaveError::UnknownGroup(name) => {
-                write!(f, "unknown save group: {name}")
+            SaveWriteError::UnknownGroup(name) => write!(f, "unknown save group: {name}"),
+            SaveWriteError::Internal(reason) => {
+                write!(f, "internal error while saving: {reason}")
             }
         }
     }
 }
 
-impl StdError for SaveError {}
+impl Display for SaveReadError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            SaveReadError::Io { path, source } => {
+                write!(f, "io error at {}: {}", path.display(), source)
+            }
+            SaveReadError::Deserialize(e) => write!(f, "failed to deserialize from RON: {e}"),
+            SaveReadError::InvalidUtf8(e) => write!(f, "saved file is not valid UTF-8: {e}"),
+            SaveReadError::GroupMemberDeserialize(e) => {
+                write!(f, "failed to deserialize group member from RON: {e}")
+            }
+            SaveReadError::UnknownGroup(name) => write!(f, "unknown save group: {name}"),
+        }
+    }
+}
+
+impl StdError for SaveWriteError {}
+impl StdError for SaveReadError {}
