@@ -1,4 +1,5 @@
 mod error;
+mod group;
 mod location;
 mod messages;
 mod plugin;
@@ -9,7 +10,9 @@ mod storage;
 pub use error::SaveError;
 pub use location::SaveLocation;
 pub use messages::{LoadFailed, SaveFailed};
-pub use plugin::{SaveAppExt, SavePlugin, SaveTiming, save_now};
+pub use plugin::{
+    SaveAppExt, SaveGroupExt, SavePlugin, SaveTiming, load_group, save_group, save_now,
+};
 pub use saveable::Saveable;
 
 /// Derives [`Saveable`] for a resource, reading the save timing from

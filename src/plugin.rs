@@ -1,15 +1,18 @@
 mod app_ext;
+mod group_ext;
 mod save_now;
 mod save_path;
 mod systems;
 mod timing;
 
 pub use self::app_ext::SaveAppExt;
+pub use self::group_ext::{SaveGroupExt, load_group, save_group};
 pub use self::save_now::save_now;
 pub(crate) use self::save_path::SavePath;
 pub use self::timing::SaveTiming;
 use crate::{LoadFailed, SaveFailed};
 use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
 
 #[derive(Default)]
 pub struct SavePlugin;
@@ -21,6 +24,16 @@ impl Plugin for SavePlugin {
     }
 }
 
+pub(crate) fn ensure_save_plugin_added(world: &World) {
+    assert!(
+        world.contains_resource::<Messages<SaveFailed>>()
+            && world.contains_resource::<Messages<LoadFailed>>(),
+        "bevy_simplesave: `SavePlugin` must be added to the app \
+         (e.g. `app.add_plugins(SavePlugin)`) before calling any \
+         `bevy_simplesave` registration or save/load function"
+    );
+}
+
 // ============================================================================================
 // UNIT TESTS
 // ============================================================================================
@@ -28,7 +41,6 @@ impl Plugin for SavePlugin {
 mod tests {
     use super::*;
     use crate::SaveLocation;
-    use bevy_ecs::prelude::*;
     use serde::{Deserialize, Serialize};
     use std::fs;
 
