@@ -2,7 +2,30 @@ mod fs_io;
 mod ron_codec;
 
 pub(crate) use fs_io::{read_bytes, write_bytes};
+use ron::{Error as RonError, error::SpannedError};
 pub(crate) use ron_codec::{deserialize_from_ron, serialize_to_ron};
+use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::io::Error as IoError;
+use std::path::PathBuf;
+
+#[derive(Debug)]
+pub(crate) enum StorageError {
+    Io { path: PathBuf, source: IoError },
+    Serialize(RonError),
+    Deserialize(SpannedError),
+}
+
+impl Display for StorageError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            StorageError::Io { path, source } => {
+                write!(f, "io error at {}: {}", path.display(), source)
+            }
+            StorageError::Serialize(e) => write!(f, "failed to serialize to RON: {e}"),
+            StorageError::Deserialize(e) => write!(f, "failed to deserialize from RON: {e}"),
+        }
+    }
+}
 
 // ============================================================================================
 // UNIT TESTS
