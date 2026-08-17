@@ -105,7 +105,7 @@ pub(crate) fn load_group_bag(
         Err(e) => {
             return Err(match e {
                 StorageError::Io { path, source } => SaveReadError::Io { path, source },
-                other => unreachable!("read_bytes only returns Io errors: {other}"),
+                _other => unreachable!("read_bytes only returns Io errors: {_other}"),
             });
         }
     };
@@ -113,7 +113,7 @@ pub(crate) fn load_group_bag(
     let ron_str = String::from_utf8(bytes).map_err(SaveReadError::InvalidUtf8)?;
     let mut bag: SaveBag = storage::deserialize_from_ron(&ron_str).map_err(|e| match e {
         StorageError::Deserialize(e) => SaveReadError::Deserialize(e),
-        other => unreachable!("deserialize_from_ron only returns Deserialize errors: {other}"),
+        _other => unreachable!("deserialize_from_ron only returns Deserialize errors: {_other}"),
     })?;
 
     for entry in entries {
