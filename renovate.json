@@ -36,10 +36,8 @@
     {
       "groupName": "bevy monorepo",
       "matchPackageNames": [
-        "/^bevy_/"
-      ],
-      "excludePackageNames": [
-        "bevy_simplesave_derive"
+        "/^bevy_/",
+        "!bevy_simplesave_derive"
       ]
     }
   ],
