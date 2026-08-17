@@ -1,15 +1,15 @@
-use crate::error::SaveError;
+use super::StorageError;
 use std::fs;
 use std::io::{Error as IoError, ErrorKind, Write};
 use std::path::Path;
 use tempfile::NamedTempFile;
 
-pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), SaveError> {
-    let parent = path.parent().ok_or_else(|| SaveError::Io {
+pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), StorageError> {
+    let parent = path.parent().ok_or_else(|| StorageError::Io {
         path: path.to_path_buf(),
         source: IoError::new(ErrorKind::InvalidInput, "path has no parent directory"),
     })?;
-    fs::create_dir_all(parent).map_err(|source| SaveError::Io {
+    fs::create_dir_all(parent).map_err(|source| StorageError::Io {
         path: parent.to_path_buf(),
         source,
     })?;
@@ -17,16 +17,18 @@ pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), SaveError> {
     atomic_write(parent, path, bytes)
 }
 
-fn atomic_write(parent: &Path, path: &Path, bytes: &[u8]) -> Result<(), SaveError> {
-    let mut tmp_file = NamedTempFile::new_in(parent).map_err(|source| SaveError::Io {
+fn atomic_write(parent: &Path, path: &Path, bytes: &[u8]) -> Result<(), StorageError> {
+    let mut tmp_file = NamedTempFile::new_in(parent).map_err(|source| StorageError::Io {
         path: parent.to_path_buf(),
         source,
     })?;
-    tmp_file.write_all(bytes).map_err(|source| SaveError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    tmp_file.persist(path).map_err(|e| SaveError::Io {
+    tmp_file
+        .write_all(bytes)
+        .map_err(|source| StorageError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    tmp_file.persist(path).map_err(|e| StorageError::Io {
         path: path.to_path_buf(),
         source: e.error,
     })?;
@@ -34,8 +36,8 @@ fn atomic_write(parent: &Path, path: &Path, bytes: &[u8]) -> Result<(), SaveErro
     Ok(())
 }
 
-pub(crate) fn read_bytes(path: &Path) -> Result<Vec<u8>, SaveError> {
-    fs::read(path).map_err(|source| SaveError::Io {
+pub(crate) fn read_bytes(path: &Path) -> Result<Vec<u8>, StorageError> {
+    fs::read(path).map_err(|source| StorageError::Io {
         path: path.to_path_buf(),
         source,
     })

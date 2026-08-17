@@ -1,13 +1,13 @@
-use crate::error::SaveError;
+use super::StorageError;
 use ron::ser::{PrettyConfig, to_string_pretty};
 use serde::{Serialize, de::DeserializeOwned};
 
-pub(crate) fn serialize_to_ron<R: Serialize>(value: &R) -> Result<String, SaveError> {
-    to_string_pretty(value, PrettyConfig::default()).map_err(SaveError::Serialize)
+pub(crate) fn serialize_to_ron<R: Serialize>(value: &R) -> Result<String, StorageError> {
+    to_string_pretty(value, PrettyConfig::default()).map_err(StorageError::Serialize)
 }
 
-pub(crate) fn deserialize_from_ron<R: DeserializeOwned>(s: &str) -> Result<R, SaveError> {
-    ron::from_str(s).map_err(SaveError::Deserialize)
+pub(crate) fn deserialize_from_ron<R: DeserializeOwned>(s: &str) -> Result<R, StorageError> {
+    ron::from_str(s).map_err(StorageError::Deserialize)
 }
 
 // ============================================================================================
