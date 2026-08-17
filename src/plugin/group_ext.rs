@@ -248,4 +248,20 @@ mod tests {
             "failed to serialize `MyResource` to RON: custom ron error"
         );
     }
+
+    #[test]
+    fn save_group_errors_when_group_was_never_registered() {
+        struct NeverRegisteredGroup;
+        impl SaveGroup for NeverRegisteredGroup {}
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let mut app = App::new();
+        app.add_plugins(SavePlugin);
+
+        let err = save_group::<NeverRegisteredGroup>(app.world(), &path)
+            .expect_err("saving an unregistered group should fail");
+        assert_matches!(err, SaveWriteError::UnknownGroup { .. });
+    }
 }
