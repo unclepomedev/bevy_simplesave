@@ -68,7 +68,7 @@ fn your_system(keys: Res<ButtonInput<KeyCode>>, world: &World) {
 }
 ```
 
-## What it does and not does
+## What it does and does not do
 
 - Saves/loads plain `Resource` structs as `.ron` files (see above for locations, timing, and grouping).
 - Runs on Windows / Linux / macOS (not WASM).
