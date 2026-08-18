@@ -1,5 +1,7 @@
 # bevy_simplesave
 
+[![Crates.io](https://img.shields.io/crates/v/bevy_simplesave.svg)](https://crates.io/crates/bevy_simplesave)
+
 A small, dependency-light crate for saving Bevy `Resource`s to `.ron` files.
 
 ## How to use
