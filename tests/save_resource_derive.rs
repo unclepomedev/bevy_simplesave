@@ -1,6 +1,6 @@
 use bevy_app::App;
 use bevy_ecs::prelude::Resource;
-use bevy_simplesave::{SaveAppExt, SaveLocation, SavePlugin, SaveResource};
+use bevy_simplesave::{SaveAppExt, SaveLocation, SaveResource, SimpleSavePlugin};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Resource, Default, SaveResource)]
@@ -15,7 +15,7 @@ fn manual_timing_does_not_save_on_change_via_derive() {
     let path = dir.path().join("settings.ron");
 
     let mut app = App::new();
-    app.add_plugins(SavePlugin);
+    app.add_plugins(SimpleSavePlugin);
     app.register_saveable::<DerivedSettings>(SaveLocation::Custom(path.clone()));
 
     app.world_mut().resource_mut::<DerivedSettings>().volume = 0.8;

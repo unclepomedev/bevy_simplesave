@@ -29,7 +29,7 @@ pub trait SaveAppExt {
 }
 
 impl SaveAppExt for App {
-    /// Panics if [`SavePlugin`] has not been added to the app.
+    /// Panics if [`SimpleSavePlugin`] has not been added to the app.
     fn register_saved_resource<R>(
         &mut self,
         location: SaveLocation,

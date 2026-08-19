@@ -8,7 +8,7 @@ A small, dependency-light crate for saving Bevy `Resource`s to `.ron` files.
 
 ### Saving a single resource
 
-1. (must) Add `SavePlugin` to your app.
+1. (must) Add `SimpleSavePlugin` to your app.
 2. Derive `SaveResource` on your resource.
 3. Add the timing to save your resource with `#[save(timing = auto | manual)]`.
     * `auto`: saves the resource whenever it changes
@@ -18,7 +18,7 @@ A small, dependency-light crate for saving Bevy `Resource`s to `.ron` files.
 
 ```rust
 use bevy::prelude::*;
-use bevy_simplesave::{SaveAppExt, SaveLocation, SavePlugin, SaveResource};
+use bevy_simplesave::{SaveAppExt, SaveLocation, SimpleSavePlugin, SaveResource};
 use serde::{Deserialize, Serialize};
 
 #[derive(Resource, Serialize, Deserialize, Default, SaveResource)]  // 2
@@ -27,7 +27,7 @@ struct Settings { volume: f32 }
 
 fn main() {
     App::new()
-        .add_plugins(SavePlugin)  // 1
+        .add_plugins(SimpleSavePlugin)  // 1
         .register_saveable::<Settings>(SaveLocation::ExeRelative("data/settings.ron".into()))  // 4
         .run();
 }
@@ -40,7 +40,7 @@ resources should be saved and loaded together as a single file (e.g. save slots)
 
 ```rust
 use bevy::prelude::*;
-use bevy_simplesave::{SaveGroup, SaveGroupExt, SavePlugin, save_group, load_group};
+use bevy_simplesave::{SaveGroup, SaveGroupExt, SimpleSavePlugin, save_group, load_group};
 use serde::{Deserialize, Serialize};
 
 struct SlotGroup;
@@ -54,7 +54,7 @@ struct Health { hp: u32 }
 
 fn main() {
     App::new()
-        .add_plugins(SavePlugin)
+        .add_plugins(SimpleSavePlugin)
         .register_group_member::<SlotGroup, Position>()
         .register_group_member::<SlotGroup, Health>()
         .add_systems(Update, your_system)
@@ -66,6 +66,25 @@ fn your_system(keys: Res<ButtonInput<KeyCode>>, world: &World) {
         let slot = 1;
         save_group::<SlotGroup>(world, format!("saves/slot_{slot}.ron"))
             .expect("failed to save slot");
+    }
+}
+```
+
+### Handling errors
+
+Save/load failures inside systems never panic. Instead, the plugin writes a `SaveFailed` or `LoadFailed` message,
+which you can read with a `MessageReader` to log or notify the user:
+
+```rust
+use bevy::prelude::*;
+use bevy_simplesave::{LoadFailed, SaveFailed};
+
+fn report_errors(mut saves: MessageReader<SaveFailed>, mut loads: MessageReader<LoadFailed>) {
+    for msg in saves.read() {
+        error!("failed to save {}: {}", msg.resource_type, msg.error);
+    }
+    for msg in loads.read() {
+        error!("failed to load {}: {}", msg.resource_type, msg.error);
     }
 }
 ```

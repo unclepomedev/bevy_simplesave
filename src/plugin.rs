@@ -15,9 +15,9 @@ use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 
 #[derive(Default)]
-pub struct SavePlugin;
+pub struct SimpleSavePlugin;
 
-impl Plugin for SavePlugin {
+impl Plugin for SimpleSavePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<SaveFailed>();
         app.add_message::<LoadFailed>();
@@ -28,8 +28,8 @@ pub(crate) fn ensure_save_plugin_added(world: &World) {
     assert!(
         world.contains_resource::<Messages<SaveFailed>>()
             && world.contains_resource::<Messages<LoadFailed>>(),
-        "bevy_simplesave: `SavePlugin` must be added to the app \
-         (e.g. `app.add_plugins(SavePlugin)`) before calling any \
+        "bevy_simplesave: `SimpleSavePlugin` must be added to the app \
+         (e.g. `app.add_plugins(SimpleSavePlugin)`) before calling any \
          `bevy_simplesave` registration or save/load function"
     );
 }
@@ -54,7 +54,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.ron");
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path.clone()),
             SaveTiming::Auto,
@@ -74,7 +74,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.ron");
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path.clone()),
             SaveTiming::Manual,
@@ -95,7 +95,7 @@ mod tests {
         fs::write(&path, "(volume: 0.42)").unwrap();
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path),
             SaveTiming::Manual,
@@ -111,7 +111,7 @@ mod tests {
         let path = dir.path().join("does_not_exist.ron");
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path),
             SaveTiming::Manual,
@@ -127,7 +127,7 @@ mod tests {
         let path1 = dir.path().join("first.ron");
         let path2 = dir.path().join("second.ron");
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path1.clone()),
             SaveTiming::Auto,
@@ -153,7 +153,7 @@ mod tests {
         let path = dir.path().join("save.ron");
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path.clone()),
             SaveTiming::Auto,
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "SavePlugin` must be added")]
+    #[should_panic(expected = "SimpleSavePlugin` must be added")]
     fn register_panics_without_save_plugin() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.ron");

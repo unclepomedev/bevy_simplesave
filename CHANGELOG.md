@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.0.2] - 2026-08-19
+
+### Changed
+
+* Renamed `SavePlugin` to `SimpleSavePlugin`.
+
 ## [0.0.1] - 2026-08-18
 
 ### Initial Release
