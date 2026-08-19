@@ -20,7 +20,7 @@ pub trait SaveGroupExt {
     /// Adds `R` as a member of group `G`. Ensures a default value of `R`
     /// exists in the world immediately; call [`load_group`] to populate it from a file.
     ///
-    /// Panics if [`crate::SavePlugin`] has not been added to the app.
+    /// Panics if [`crate::SimpleSavePlugin`] has not been added to the app.
     fn register_group_member<G: SaveGroup, R>(&mut self) -> &mut Self
     where
         R: Resource + Serialize + DeserializeOwned + Default;
@@ -87,7 +87,7 @@ pub fn load_group<G: SaveGroup>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LoadFailed, SavePlugin};
+    use crate::{LoadFailed, SimpleSavePlugin};
     use serde::{Deserialize, Serialize};
     use std::assert_matches;
     use std::fs;
@@ -111,7 +111,7 @@ mod tests {
         let path = dir.path().join("slot_1.ron");
 
         let mut save_app = App::new();
-        save_app.add_plugins(SavePlugin);
+        save_app.add_plugins(SimpleSavePlugin);
         save_app.register_group_member::<SlotGroup, Position>();
         save_app.register_group_member::<SlotGroup, Health>();
         save_app.world_mut().resource_mut::<Position>().x = 3.0;
@@ -120,7 +120,7 @@ mod tests {
         save_group::<SlotGroup>(save_app.world(), &path).expect("save should succeed");
 
         let mut load_app = App::new();
-        load_app.add_plugins(SavePlugin);
+        load_app.add_plugins(SimpleSavePlugin);
         load_app.register_group_member::<SlotGroup, Position>();
         load_app.register_group_member::<SlotGroup, Health>();
         load_group::<SlotGroup>(load_app.world_mut(), &path).expect("load should succeed");
@@ -136,14 +136,14 @@ mod tests {
 
         // Old save: only Position was known at the time.
         let mut old_app = App::new();
-        old_app.add_plugins(SavePlugin);
+        old_app.add_plugins(SimpleSavePlugin);
         old_app.register_group_member::<SlotGroup, Position>();
         old_app.world_mut().resource_mut::<Position>().x = 7.0;
         save_group::<SlotGroup>(old_app.world(), &path).unwrap();
 
         // Newer build adds Health to the group.
         let mut new_app = App::new();
-        new_app.add_plugins(SavePlugin);
+        new_app.add_plugins(SimpleSavePlugin);
         new_app.register_group_member::<SlotGroup, Position>();
         new_app.register_group_member::<SlotGroup, Health>();
         load_group::<SlotGroup>(new_app.world_mut(), &path).expect("load should succeed");
@@ -158,7 +158,7 @@ mod tests {
         let path = dir.path().join("slot_duplicate.ron");
 
         let mut save_app = App::new();
-        save_app.add_plugins(SavePlugin);
+        save_app.add_plugins(SimpleSavePlugin);
         save_app.register_group_member::<SlotGroup, Position>();
         save_app.register_group_member::<SlotGroup, Position>();
         save_app.world_mut().resource_mut::<Position>().x = 42.0;
@@ -166,7 +166,7 @@ mod tests {
         save_group::<SlotGroup>(save_app.world(), &path).expect("save should succeed");
 
         let mut load_app = App::new();
-        load_app.add_plugins(SavePlugin);
+        load_app.add_plugins(SimpleSavePlugin);
         load_app.register_group_member::<SlotGroup, Position>();
         load_app.register_group_member::<SlotGroup, Position>();
         load_group::<SlotGroup>(load_app.world_mut(), &path).expect("load should succeed");
@@ -181,7 +181,7 @@ mod tests {
         fs::write(&path, b"not valid ron {{{").unwrap();
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_group_member::<SlotGroup, Position>();
 
         let err = load_group::<SlotGroup>(app.world_mut(), &path)
@@ -201,7 +201,7 @@ mod tests {
         fs::write(&path, bag_ron).unwrap();
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_group_member::<SlotGroup, Position>();
         app.register_group_member::<SlotGroup, Health>();
 
@@ -227,7 +227,7 @@ mod tests {
         let path = dir.path().join("slot_1.ron");
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_group_member::<SlotGroup, Position>();
         app.world_mut().remove_resource::<Position>();
 
@@ -258,7 +258,7 @@ mod tests {
         let path = dir.path().join("slot_1.ron");
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
 
         let err = save_group::<NeverRegisteredGroup>(app.world(), &path)
             .expect_err("saving an unregistered group should fail");

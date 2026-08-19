@@ -71,7 +71,7 @@ fn read_err(e: StorageError) -> SaveReadError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LoadFailed, SaveAppExt, SaveLocation, SavePlugin, SaveTiming};
+    use crate::{LoadFailed, SaveAppExt, SaveLocation, SaveTiming, SimpleSavePlugin};
     use bevy_app::App;
     use bevy_ecs::prelude::Messages;
     use serde::{Deserialize, Serialize};
@@ -154,7 +154,7 @@ mod tests {
         fs::write(&path, b"not valid ron {{{").unwrap();
 
         let mut app = App::new();
-        app.add_plugins(SavePlugin);
+        app.add_plugins(SimpleSavePlugin);
         app.register_saved_resource::<DummySettings>(
             SaveLocation::Custom(path),
             SaveTiming::Manual,

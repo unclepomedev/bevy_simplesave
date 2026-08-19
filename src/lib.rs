@@ -12,7 +12,7 @@ pub use group::SaveGroup;
 pub use location::SaveLocation;
 pub use messages::{LoadFailed, SaveFailed};
 pub use plugin::{
-    SaveAppExt, SaveGroupExt, SavePlugin, SaveTiming, load_group, save_group, save_now,
+    SaveAppExt, SaveGroupExt, SaveTiming, SimpleSavePlugin, load_group, save_group, save_now,
 };
 pub use saveable::Saveable;
 
@@ -23,7 +23,7 @@ pub use saveable::Saveable;
 /// ```
 /// use bevy_app::App;
 /// use bevy_ecs::prelude::Resource;
-/// use bevy_simplesave::{SaveAppExt, SaveLocation, SavePlugin, SaveResource};
+/// use bevy_simplesave::{SaveAppExt, SaveLocation, SimpleSavePlugin, SaveResource};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Resource, Serialize, Deserialize, Default, SaveResource)]
@@ -33,7 +33,7 @@ pub use saveable::Saveable;
 /// }
 ///
 /// let mut app = App::new();
-/// app.add_plugins(SavePlugin);
+/// app.add_plugins(SimpleSavePlugin);
 /// app.register_saveable::<Settings>(SaveLocation::Custom("/tmp/example_settings.ron".into()));
 /// ```
 pub use bevy_simplesave_derive::SaveResource;
