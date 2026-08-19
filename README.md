@@ -70,6 +70,25 @@ fn your_system(keys: Res<ButtonInput<KeyCode>>, world: &World) {
 }
 ```
 
+### Handling errors
+
+Save/load failures inside systems never panic. Instead, the plugin writes a `SaveFailed` or `LoadFailed` message,
+which you can read with a `MessageReader` to log or notify the user:
+
+```rust
+use bevy::prelude::*;
+use bevy_simplesave::{LoadFailed, SaveFailed};
+
+fn report_errors(mut saves: MessageReader<SaveFailed>, mut loads: MessageReader<LoadFailed>) {
+    for msg in saves.read() {
+        error!("failed to save {}: {}", msg.resource_type, msg.error);
+    }
+    for msg in loads.read() {
+        error!("failed to load {}: {}", msg.resource_type, msg.error);
+    }
+}
+```
+
 ## What it does and does not do
 
 - Saves/loads plain `Resource` structs as `.ron` files (see above for locations, timing, and grouping).
