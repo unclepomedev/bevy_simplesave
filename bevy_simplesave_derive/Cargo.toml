@@ -1,6 +1,6 @@
 [package]
 name = "bevy_simplesave_derive"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 description = "Derive macro for bevy_simplesave"
 license = "MIT OR Apache-2.0"

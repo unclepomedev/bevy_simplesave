@@ -1,6 +1,6 @@
 [package]
 name = "bevy_simplesave"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 description = "A small, dependency-light crate for saving Bevy Resources to .ron files"
 license = "MIT OR Apache-2.0"
@@ -16,7 +16,7 @@ directories = "6.0"
 bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }
 bevy_app = { version = "0.19", default-features = false, features = ["std"] }
 tempfile = "3"
-bevy_simplesave_derive = { path = "bevy_simplesave_derive", version = "0.0.2" }
+bevy_simplesave_derive = { path = "bevy_simplesave_derive", version = "0.0.3" }
 
 [workspace]
 members = [".", "bevy_simplesave_derive"]

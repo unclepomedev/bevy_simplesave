@@ -201,7 +201,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_simplesave"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_simplesave_derive"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "proc-macro2",
  "quote",
