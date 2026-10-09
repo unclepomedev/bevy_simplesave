@@ -96,6 +96,12 @@ fn report_errors(mut saves: MessageReader<SaveFailed>, mut loads: MessageReader<
 - No encryption / obfuscation.
 - Missing values are filled in via `#[serde(default)]`: perform a schema migration yourself if necessary.
 
+## Compatible Bevy versions
+
+| Bevy version | `bevy_simplesave` version |
+|:-------------|:--------------------------|
+| `0.20`       | `0.1`                     |
+
 ## License
 
 MIT or Apache-2.0
