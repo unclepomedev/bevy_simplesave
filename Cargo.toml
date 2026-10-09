@@ -1,7 +1,6 @@
 [package]
 name = "bevy_simplesave"
-# TODO: to 0.1.0
-version = "0.0.4"
+version = "0.1.0"
 edition = "2024"
 description = "A small, dependency-light crate for saving Bevy Resources to .ron files"
 license = "MIT OR Apache-2.0"
@@ -14,10 +13,9 @@ categories = ["game-development"]
 serde = { version = "1", features = ["derive"] }
 ron = "0.12"
 directories = "6.0"
-# TODO: to 0.20, 0.1.0
-bevy_ecs = { version = "0.20.0-rc.1", default-features = false, features = ["std"] }
-bevy_app = { version = "0.20.0-rc.1", default-features = false, features = ["std"] }
-bevy_simplesave_derive = { path = "bevy_simplesave_derive", version = "0.0.4" }
+bevy_ecs = { version = "0.20", default-features = false, features = ["std"] }
+bevy_app = { version = "0.20", default-features = false, features = ["std"] }
+bevy_simplesave_derive = { path = "bevy_simplesave_derive", version = "0.1.0" }
 tempfile = "3"
 
 [workspace]
