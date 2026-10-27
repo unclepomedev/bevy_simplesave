@@ -1,7 +1,9 @@
 use super::ensure_save_plugin_added;
 use crate::{
     SaveReadError, SaveWriteError,
-    group::{ErasedSave, SaveEntry, SaveGroup, load_group_bag, save_group_bag},
+    group::{
+        ErasedSave, SaveEntry, SaveGroup, load_group_bag, load_group_bag_strict, save_group_bag,
+    },
 };
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -11,14 +13,6 @@ use std::{
     collections::HashMap,
     path::Path,
 };
-
-/// The set of resource types registered to a single named group.
-type GroupMemberList = Vec<Box<dyn ErasedSave>>;
-
-#[derive(Resource, Default)]
-struct GroupMembers {
-    by_group: HashMap<TypeId, GroupMemberList>,
-}
 
 pub trait SaveGroupExt {
     /// Adds `R` as a member of group `G`. Ensures a default value of `R`
@@ -70,6 +64,31 @@ pub fn load_group<G: SaveGroup>(
     world: &mut World,
     path: impl AsRef<Path>,
 ) -> Result<(), SaveReadError> {
+    load_with::<G>(world, path.as_ref(), load_group_bag)
+}
+
+pub fn load_group_strict<G: SaveGroup>(
+    world: &mut World,
+    path: impl AsRef<Path>,
+) -> Result<(), SaveReadError> {
+    load_with::<G>(world, path.as_ref(), load_group_bag_strict)
+}
+
+/// The set of resource types registered to a single named group.
+type GroupMemberList = Vec<Box<dyn ErasedSave>>;
+
+#[derive(Resource, Default)]
+struct GroupMembers {
+    by_group: HashMap<TypeId, GroupMemberList>,
+}
+
+type BagLoader = fn(&mut World, &[Box<dyn ErasedSave>], &Path) -> Result<(), SaveReadError>;
+
+fn load_with<G: SaveGroup>(
+    world: &mut World,
+    path: &Path,
+    loader: BagLoader,
+) -> Result<(), SaveReadError> {
     if !world.contains_resource::<GroupMembers>() {
         return Err(SaveReadError::UnknownGroup {
             group: type_name::<G>().to_string(),
@@ -81,7 +100,7 @@ pub fn load_group<G: SaveGroup>(
                 group: type_name::<G>().to_string(),
             }
         })?;
-        load_group_bag(world, entries, path.as_ref())
+        loader(world, entries, path)
     })
 }
 
