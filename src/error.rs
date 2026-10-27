@@ -1,10 +1,11 @@
-use ron::Error as RonError;
-use ron::error::SpannedError;
-use std::error::Error as StdError;
-use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::io::Error as IoError;
-use std::path::PathBuf;
-use std::string::FromUtf8Error;
+use ron::{Error as RonError, error::SpannedError};
+use std::{
+    error::Error as StdError,
+    fmt::{Display, Formatter, Result as FmtResult},
+    io::{Error as IoError, ErrorKind},
+    path::PathBuf,
+    string::FromUtf8Error,
+};
 
 #[derive(Debug)]
 pub enum SaveWriteError {
@@ -28,11 +29,22 @@ pub enum SaveWriteError {
 
 #[derive(Debug)]
 pub enum SaveReadError {
-    Io { path: PathBuf, source: IoError },
+    Io {
+        path: PathBuf,
+        source: IoError,
+    },
     Deserialize(SpannedError),
     InvalidUtf8(FromUtf8Error),
-    GroupMemberDeserialize(RonError),
-    UnknownGroup { group: String },
+    GroupMemberDeserialize {
+        resource_type: String,
+        source: RonError,
+    },
+    MissingMember {
+        resource_type: String,
+    },
+    UnknownGroup {
+        group: String,
+    },
 }
 
 impl Display for SaveWriteError {
@@ -67,8 +79,17 @@ impl Display for SaveReadError {
             }
             SaveReadError::Deserialize(e) => write!(f, "failed to deserialize from RON: {e}"),
             SaveReadError::InvalidUtf8(e) => write!(f, "saved file is not valid UTF-8: {e}"),
-            SaveReadError::GroupMemberDeserialize(e) => {
-                write!(f, "failed to deserialize group member from RON: {e}")
+            SaveReadError::GroupMemberDeserialize {
+                resource_type,
+                source,
+            } => {
+                write!(
+                    f,
+                    "failed to deserialize `{resource_type}` from RON: {source}"
+                )
+            }
+            SaveReadError::MissingMember { resource_type } => {
+                write!(f, "save data has no entry for `{resource_type}`")
             }
             SaveReadError::UnknownGroup { group: name } => write!(f, "unknown save group: {name}"),
         }
@@ -91,8 +112,14 @@ impl StdError for SaveReadError {
             SaveReadError::Io { source, .. } => Some(source),
             SaveReadError::Deserialize(source) => Some(source),
             SaveReadError::InvalidUtf8(source) => Some(source),
-            SaveReadError::GroupMemberDeserialize(source) => Some(source),
+            SaveReadError::GroupMemberDeserialize { source, .. } => Some(source),
             _ => None,
         }
+    }
+}
+
+impl SaveReadError {
+    pub fn is_not_found(&self) -> bool {
+        matches!(self, SaveReadError::Io { source, .. } if source.kind() == ErrorKind::NotFound)
     }
 }

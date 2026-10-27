@@ -1,6 +1,5 @@
 use bevy_ecs::prelude::Resource;
-use std::marker::PhantomData;
-use std::path::PathBuf;
+use std::{marker::PhantomData, path::PathBuf};
 
 #[derive(Resource)]
 pub(crate) struct SavePath<R> {

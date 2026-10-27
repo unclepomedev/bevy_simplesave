@@ -80,7 +80,10 @@ where
                     world.insert_resource(R::default());
                     world.write_message(LoadFailed {
                         resource_type: type_name::<R>(),
-                        error: SaveReadError::GroupMemberDeserialize(e),
+                        error: SaveReadError::GroupMemberDeserialize {
+                            resource_type: type_name::<R>().to_string(),
+                            source: e,
+                        },
                     });
                 }
             },

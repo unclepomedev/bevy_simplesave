@@ -1,12 +1,16 @@
 use super::ensure_save_plugin_added;
-use crate::group::{ErasedSave, SaveEntry, SaveGroup, load_group_bag, save_group_bag};
-use crate::{SaveReadError, SaveWriteError};
+use crate::{
+    SaveReadError, SaveWriteError,
+    group::{ErasedSave, SaveEntry, SaveGroup, load_group_bag, save_group_bag},
+};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
-use std::any::{TypeId, type_name};
-use std::collections::HashMap;
-use std::path::Path;
+use std::{
+    any::{TypeId, type_name},
+    collections::HashMap,
+    path::Path,
+};
 
 /// The set of resource types registered to a single named group.
 type GroupMemberList = Vec<Box<dyn ErasedSave>>;
@@ -218,7 +222,7 @@ mod tests {
         );
         let msg = messages.iter_current_update_messages().next().unwrap();
         assert_eq!(msg.resource_type, type_name::<Position>());
-        assert_matches!(msg.error, SaveReadError::GroupMemberDeserialize(_));
+        assert_matches!(msg.error, SaveReadError::GroupMemberDeserialize { .. });
     }
 
     #[test]

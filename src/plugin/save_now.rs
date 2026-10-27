@@ -1,8 +1,5 @@
-use crate::SaveWriteError;
-use crate::plugin::SavePath;
-use crate::resource::save_resource;
-use bevy_ecs::error::Result;
-use bevy_ecs::prelude::{Resource, World};
+use crate::{SaveWriteError, plugin::SavePath, resource::save_resource};
+use bevy_ecs::prelude::*;
 use serde::Serialize;
 use std::any::type_name;
 

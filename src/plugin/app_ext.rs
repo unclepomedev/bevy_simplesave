@@ -1,13 +1,13 @@
-use super::systems::auto_save_system;
-use super::{SavePath, ensure_save_plugin_added};
-use crate::resource::load_resource;
-use crate::{LoadFailed, SaveLocation, SaveTiming, Saveable};
+use super::{SavePath, ensure_save_plugin_added, systems::auto_save_system};
+use crate::{LoadFailed, SaveLocation, SaveTiming, Saveable, resource::load_resource};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
-use std::any::type_name;
-use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
+use std::{
+    any::type_name,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+};
 
 /// Marker resource used to guard against registering `auto_save_system::<R>`
 /// more than once if `register_saved_resource::<R>` is called multiple times.

@@ -1,12 +1,10 @@
-use crate::storage;
-use crate::storage::StorageError;
-use crate::{SaveReadError, SaveWriteError};
-use bevy_ecs::resource::Resource;
-use bevy_ecs::world::World;
+use crate::{
+    error::{SaveReadError, SaveWriteError},
+    storage::{self, StorageError},
+};
+use bevy_ecs::{resource::Resource, world::World};
 use serde::{Serialize, de::DeserializeOwned};
-use std::any::type_name;
-use std::io::ErrorKind;
-use std::path::Path;
+use std::{any::type_name, io::ErrorKind, path::Path};
 
 pub(crate) fn save_resource<R: Resource + Serialize>(
     world: &World,
