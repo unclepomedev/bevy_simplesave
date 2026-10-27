@@ -5,11 +5,14 @@ mod save_path;
 mod systems;
 mod timing;
 
-pub use self::app_ext::SaveAppExt;
-pub use self::group_ext::{SaveGroupExt, load_group, save_group};
-pub use self::save_now::save_now;
+pub use self::{
+    app_ext::SaveAppExt,
+    group_ext::{SaveGroupExt, load_group, load_group_strict, save_group},
+    save_now::save_now,
+    timing::SaveTiming,
+};
+
 pub(crate) use self::save_path::SavePath;
-pub use self::timing::SaveTiming;
 use crate::{LoadFailed, SaveFailed};
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;

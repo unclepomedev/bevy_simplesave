@@ -1,6 +1,4 @@
-use crate::messages::SaveFailed;
-use crate::plugin::save_path::SavePath;
-use crate::resource::write_resource_ron;
+use crate::{messages::SaveFailed, plugin::save_path::SavePath, resource::write_resource_ron};
 use bevy_ecs::prelude::*;
 use serde::Serialize;
 use std::any::type_name;

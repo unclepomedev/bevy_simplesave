@@ -1,12 +1,17 @@
 mod fs_io;
 mod ron_codec;
 
-pub(crate) use fs_io::{read_bytes, write_bytes};
+pub(crate) use self::{
+    fs_io::{read_bytes, write_bytes},
+    ron_codec::{deserialize_from_ron, serialize_to_ron},
+};
+
 use ron::{Error as RonError, error::SpannedError};
-pub(crate) use ron_codec::{deserialize_from_ron, serialize_to_ron};
-use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::io::Error as IoError;
-use std::path::PathBuf;
+use std::{
+    fmt::{Display, Formatter, Result as FmtResult},
+    io::Error as IoError,
+    path::PathBuf,
+};
 
 #[derive(Debug)]
 pub(crate) enum StorageError {

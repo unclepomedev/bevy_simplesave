@@ -1,8 +1,10 @@
 use directories::ProjectDirs;
-use std::env;
-use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::io::Error as IoError;
-use std::path::{Component, Path, PathBuf};
+use std::{
+    env,
+    fmt::{Display, Formatter, Result as FmtResult},
+    io::Error as IoError,
+    path::{Component, Path, PathBuf},
+};
 
 /// Where a saved resource's `.ron` file should live on disk.
 #[derive(Debug, Clone)]

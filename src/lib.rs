@@ -7,14 +7,17 @@ mod resource;
 mod saveable;
 mod storage;
 
-pub use error::{SaveReadError, SaveWriteError};
-pub use group::SaveGroup;
-pub use location::SaveLocation;
-pub use messages::{LoadFailed, SaveFailed};
-pub use plugin::{
-    SaveAppExt, SaveGroupExt, SaveTiming, SimpleSavePlugin, load_group, save_group, save_now,
+pub use crate::{
+    error::{SaveReadError, SaveWriteError},
+    group::{SaveGroup, read_member},
+    location::SaveLocation,
+    messages::{LoadFailed, SaveFailed},
+    plugin::{
+        SaveAppExt, SaveGroupExt, SaveTiming, SimpleSavePlugin, load_group, load_group_strict,
+        save_group, save_now,
+    },
+    saveable::Saveable,
 };
-pub use saveable::Saveable;
 
 /// Derives [`Saveable`] for a resource, reading the save timing from
 /// `#[save(timing = auto | manual)]`.

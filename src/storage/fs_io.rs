@@ -1,7 +1,9 @@
 use super::StorageError;
-use std::fs;
-use std::io::{Error as IoError, ErrorKind, Write};
-use std::path::Path;
+use std::{
+    fs,
+    io::{Error as IoError, ErrorKind, Write},
+    path::Path,
+};
 use tempfile::NamedTempFile;
 
 pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), StorageError> {
