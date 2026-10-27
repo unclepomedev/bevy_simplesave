@@ -226,14 +226,14 @@ mod tests {
 
         save_group::<SlotGroup>(save_app.world(), &path).expect("save should succeed");
 
-        let mut load_group_strict = App::new();
-        load_group_strict.add_plugins(SimpleSavePlugin);
-        load_group_strict.register_group_member::<SlotGroup, Position>();
-        load_group_strict.register_group_member::<SlotGroup, Health>();
-        load_group::<SlotGroup>(load_group_strict.world_mut(), &path).expect("load should succeed");
+        let mut load_app = App::new();
+        load_app.add_plugins(SimpleSavePlugin);
+        load_app.register_group_member::<SlotGroup, Position>();
+        load_app.register_group_member::<SlotGroup, Health>();
+        load_group_strict::<SlotGroup>(load_app.world_mut(), &path).expect("load should succeed");
 
-        assert_eq!(load_group_strict.world().resource::<Position>().x, 3.0);
-        assert_eq!(load_group_strict.world().resource::<Health>().hp, 42);
+        assert_eq!(load_app.world().resource::<Position>().x, 3.0);
+        assert_eq!(load_app.world().resource::<Health>().hp, 42);
     }
 
     #[test]

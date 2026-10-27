@@ -1,5 +1,5 @@
 use crate::{LoadFailed, SaveReadError, SaveWriteError, storage, storage::StorageError};
-use bevy_ecs::{error::Result as EcsResult, resource::Resource, world::World};
+use bevy_ecs::{resource::Resource, world::World};
 use ron::Value as RonValue;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{any::type_name, collections::HashMap, marker::PhantomData, path::Path};
@@ -175,7 +175,7 @@ fn read_bag(path: &Path) -> Result<SaveBag, SaveReadError> {
     })
 }
 
-fn decode_member<R: DeserializeOwned>(value: Option<RonValue>) -> EcsResult<R, SaveReadError> {
+fn decode_member<R: DeserializeOwned>(value: Option<RonValue>) -> Result<R, SaveReadError> {
     let value = value.ok_or_else(|| SaveReadError::MissingMember {
         resource_type: type_name::<R>().to_string(),
     })?;
