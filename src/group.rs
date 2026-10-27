@@ -1,6 +1,6 @@
 use crate::{LoadFailed, SaveReadError, SaveWriteError, storage, storage::StorageError};
 use bevy_ecs::{resource::Resource, world::World};
-use ron::Value as RonValue;
+use ron::value::RawValue;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{any::type_name, collections::HashMap, marker::PhantomData, path::Path};
 
@@ -20,15 +20,17 @@ pub fn read_member<R: DeserializeOwned>(path: impl AsRef<Path>) -> Result<R, Sav
     decode_member::<R>(bag.remove(type_name::<R>()))
 }
 
-pub(crate) type SaveBag = HashMap<String, RonValue>;
+pub(crate) type SaveBag = HashMap<String, Box<RawValue>>;
 pub(crate) type Commit = Box<dyn FnOnce(&mut World) + Send>;
 
 /// A type-erased save/load operation for one resource type within a group.
 pub(crate) trait ErasedSave: Send + Sync + 'static {
     fn type_key(&self) -> &'static str;
-    fn extract(&self, world: &World) -> Result<RonValue, SaveWriteError>;
-    fn apply(&self, world: &mut World, value: Option<RonValue>);
-    fn prepare(&self, value: Option<RonValue>) -> Result<Commit, SaveReadError>;
+    fn extract(&self, world: &World) -> Result<Box<RawValue>, SaveWriteError>;
+    /// Missing key falls back to `Default`; a broken value also falls back and emits `LoadFailed`.
+    fn apply(&self, world: &mut World, value: Option<Box<RawValue>>);
+    /// Decodes without touching the world. Missing key or broken value is an error.
+    fn prepare(&self, value: Option<Box<RawValue>>) -> Result<Commit, SaveReadError>;
 }
 
 pub(crate) struct SaveEntry<R>(PhantomData<fn() -> R>);
@@ -47,54 +49,34 @@ where
         type_name::<R>()
     }
 
-    fn extract(&self, world: &World) -> Result<RonValue, SaveWriteError> {
+    fn extract(&self, world: &World) -> Result<Box<RawValue>, SaveWriteError> {
         let resource =
             world
                 .get_resource::<R>()
                 .ok_or_else(|| SaveWriteError::ResourceMissing {
                     resource_type: type_name::<R>().to_string(),
                 })?;
-        let ron_str = storage::serialize_to_ron(resource).map_err(|e| match e {
-            StorageError::Serialize(e) => SaveWriteError::Serialize {
-                resource_type: type_name::<R>().to_string(),
-                source: e,
-            },
-            other => SaveWriteError::Internal(format!("{}: {other}", type_name::<R>())),
-        })?;
-        storage::deserialize_from_ron::<RonValue>(&ron_str).map_err(|e| {
-            SaveWriteError::Internal(format!(
-                "re-parsing RON produced for `{}` failed: {e}",
-                type_name::<R>()
-            ))
+        RawValue::from_rust(resource).map_err(|source| SaveWriteError::Serialize {
+            resource_type: type_name::<R>().to_string(),
+            source,
         })
     }
 
-    /// - Key absent from the file falls back to `Default`.
-    /// - Value that fails to deserialize falls back to `Default` and emits a `LoadFailed` message.
-    fn apply(&self, world: &mut World, value: Option<RonValue>) {
-        match value {
-            Some(v) => match R::deserialize(v) {
-                Ok(val) => {
-                    world.insert_resource(val);
-                }
-                Err(e) => {
-                    world.insert_resource(R::default());
-                    world.write_message(LoadFailed {
-                        resource_type: type_name::<R>(),
-                        error: SaveReadError::GroupMemberDeserialize {
-                            resource_type: type_name::<R>().to_string(),
-                            source: e,
-                        },
-                    });
-                }
-            },
-            None => {
+    fn apply(&self, world: &mut World, value: Option<Box<RawValue>>) {
+        match decode_member::<R>(value) {
+            Ok(resource) => world.insert_resource(resource),
+            Err(SaveReadError::MissingMember { .. }) => world.insert_resource(R::default()),
+            Err(error) => {
                 world.insert_resource(R::default());
+                world.write_message(LoadFailed {
+                    resource_type: type_name::<R>(),
+                    error,
+                });
             }
         }
     }
 
-    fn prepare(&self, value: Option<RonValue>) -> Result<Commit, SaveReadError> {
+    fn prepare(&self, value: Option<Box<RawValue>>) -> Result<Commit, SaveReadError> {
         let resource = decode_member::<R>(value)?;
         Ok(Box::new(move |world: &mut World| {
             world.insert_resource(resource);
@@ -175,12 +157,13 @@ fn read_bag(path: &Path) -> Result<SaveBag, SaveReadError> {
     })
 }
 
-fn decode_member<R: DeserializeOwned>(value: Option<RonValue>) -> Result<R, SaveReadError> {
-    let value = value.ok_or_else(|| SaveReadError::MissingMember {
+fn decode_member<R: DeserializeOwned>(value: Option<Box<RawValue>>) -> Result<R, SaveReadError> {
+    let raw = value.ok_or_else(|| SaveReadError::MissingMember {
         resource_type: type_name::<R>().to_string(),
     })?;
-    R::deserialize(value).map_err(|source| SaveReadError::GroupMemberDeserialize {
-        resource_type: type_name::<R>().to_string(),
-        source,
-    })
+    raw.into_rust::<R>()
+        .map_err(|source| SaveReadError::GroupMemberDeserialize {
+            resource_type: type_name::<R>().to_string(),
+            source: Box::new(source),
+        })
 }

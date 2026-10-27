@@ -37,7 +37,7 @@ pub enum SaveReadError {
     InvalidUtf8(FromUtf8Error),
     GroupMemberDeserialize {
         resource_type: String,
-        source: RonError,
+        source: Box<SpannedError>,
     },
     MissingMember {
         resource_type: String,

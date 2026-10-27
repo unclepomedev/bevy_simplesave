@@ -432,4 +432,69 @@ mod tests {
         assert!(!corrupt.is_not_found());
         assert_matches!(corrupt, SaveReadError::Deserialize(_));
     }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Resource, Default)]
+    enum Phase {
+        #[default]
+        Intro,
+        Chapter(u32),
+        Scene {
+            id: u32,
+            done: bool,
+        },
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Resource, Default)]
+    struct Misc {
+        maybe: Option<u32>,
+        pair: (u8, u8),
+        names: Vec<String>,
+    }
+
+    #[test]
+    fn group_round_trip_preserves_enums_options_tuples_and_vecs() {
+        let phases = [
+            Phase::Intro,
+            Phase::Chapter(3),
+            Phase::Scene { id: 7, done: true },
+        ];
+        let misc_values = [
+            Misc {
+                maybe: None,
+                pair: (1, 2),
+                names: vec![],
+            },
+            Misc {
+                maybe: Some(5),
+                pair: (3, 4),
+                names: vec!["a".into(), "b".into()],
+            },
+        ];
+
+        for phase in &phases {
+            for misc in &misc_values {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("slot_1.ron");
+
+                let mut save_app = App::new();
+                save_app.add_plugins(SimpleSavePlugin);
+                save_app.register_group_member::<SlotGroup, Phase>();
+                save_app.register_group_member::<SlotGroup, Misc>();
+                *save_app.world_mut().resource_mut::<Phase>() = phase.clone();
+                *save_app.world_mut().resource_mut::<Misc>() = misc.clone();
+                save_group::<SlotGroup>(save_app.world(), &path).unwrap();
+
+                let mut load_app = App::new();
+                load_app.add_plugins(SimpleSavePlugin);
+                load_app.register_group_member::<SlotGroup, Phase>();
+                load_app.register_group_member::<SlotGroup, Misc>();
+                load_group_strict::<SlotGroup>(load_app.world_mut(), &path)
+                    .unwrap_or_else(|e| panic!("{phase:?} / {misc:?}: {e}"));
+
+                assert_eq!(load_app.world().resource::<Phase>(), phase);
+                assert_eq!(load_app.world().resource::<Misc>(), misc);
+                assert_eq!(&read_member::<Phase>(&path).unwrap(), phase);
+            }
+        }
+    }
 }
