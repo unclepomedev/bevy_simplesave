@@ -110,7 +110,7 @@ fn load_with<G: SaveGroup>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LoadFailed, SimpleSavePlugin};
+    use crate::{LoadFailed, SimpleSavePlugin, read_member};
     use serde::{Deserialize, Serialize};
     use std::assert_matches;
     use std::fs;
@@ -370,5 +370,66 @@ mod tests {
         let err = save_group::<NeverRegisteredGroup>(app.world(), &path)
             .expect_err("saving an unregistered group should fail");
         assert_matches!(err, SaveWriteError::UnknownGroup { .. });
+    }
+
+    #[test]
+    fn read_member_reads_one_member_without_world_or_registration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let mut app = App::new();
+        app.add_plugins(SimpleSavePlugin);
+        app.register_group_member::<SlotGroup, Position>();
+        app.register_group_member::<SlotGroup, Health>();
+        app.world_mut().resource_mut::<Health>().hp = 42;
+        save_group::<SlotGroup>(app.world(), &path).unwrap();
+
+        let health = read_member::<Health>(&path).expect("should read");
+        assert_eq!(health, Health { hp: 42 });
+    }
+
+    #[test]
+    fn read_member_fails_when_the_key_is_absent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let mut app = App::new();
+        app.add_plugins(SimpleSavePlugin);
+        app.register_group_member::<SlotGroup, Position>();
+        save_group::<SlotGroup>(app.world(), &path).unwrap();
+
+        let err = read_member::<Health>(&path).expect_err("Health is not in the file");
+        assert_matches!(err, SaveReadError::MissingMember { .. });
+    }
+
+    #[test]
+    fn read_member_fails_on_corrupt_member_but_other_members_stay_readable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+        let position_key = type_name::<Position>();
+        let health_key = type_name::<Health>();
+        fs::write(
+            &path,
+            format!(r#"{{"{position_key}": (x: 9.0), "{health_key}": (hp: "bad")}}"#),
+        )
+        .unwrap();
+
+        let err = read_member::<Health>(&path).expect_err("corrupt member");
+        assert_matches!(err, SaveReadError::GroupMemberDeserialize { .. });
+        assert_eq!(read_member::<Position>(&path).unwrap(), Position { x: 9.0 });
+    }
+
+    #[test]
+    fn read_member_distinguishes_missing_file_from_corrupt_file() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let missing = read_member::<Health>(dir.path().join("none.ron")).expect_err("missing");
+        assert!(missing.is_not_found());
+
+        let corrupt_path = dir.path().join("corrupt.ron");
+        fs::write(&corrupt_path, b"not valid ron {{{").unwrap();
+        let corrupt = read_member::<Health>(&corrupt_path).expect_err("corrupt");
+        assert!(!corrupt.is_not_found());
+        assert_matches!(corrupt, SaveReadError::Deserialize(_));
     }
 }
