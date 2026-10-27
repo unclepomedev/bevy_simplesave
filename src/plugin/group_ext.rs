@@ -129,6 +129,66 @@ mod tests {
     }
 
     #[test]
+    fn strict_load_fails_on_corrupt_member_without_load_failed_message() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+        let position_key = type_name::<Position>();
+        let health_key = type_name::<Health>();
+        fs::write(
+            &path,
+            format!(r#"{{"{position_key}": (x: 9.0), "{health_key}": (hp: "bad")}}"#),
+        )
+        .unwrap();
+
+        let mut app = App::new();
+        app.add_plugins(SimpleSavePlugin);
+        app.register_group_member::<SlotGroup, Position>();
+        app.register_group_member::<SlotGroup, Health>();
+        app.world_mut().resource_mut::<Position>().x = 1.0;
+
+        let err = load_group_strict::<SlotGroup>(app.world_mut(), &path).expect_err("must fail");
+        assert_matches!(err, SaveReadError::GroupMemberDeserialize { .. });
+        assert_eq!(app.world().resource::<Position>().x, 1.0);
+        assert_eq!(app.world().resource::<Messages<LoadFailed>>().len(), 0);
+    }
+
+    #[test]
+    fn strict_load_fails_on_missing_member_and_leaves_world_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let mut old_app = App::new();
+        old_app.add_plugins(SimpleSavePlugin);
+        old_app.register_group_member::<SlotGroup, Position>();
+        old_app.world_mut().resource_mut::<Position>().x = 9.0;
+        save_group::<SlotGroup>(old_app.world(), &path).unwrap();
+
+        let mut app = App::new();
+        app.add_plugins(SimpleSavePlugin);
+        app.register_group_member::<SlotGroup, Position>();
+        app.register_group_member::<SlotGroup, Health>();
+        app.world_mut().resource_mut::<Position>().x = 1.0;
+
+        let err = load_group_strict::<SlotGroup>(app.world_mut(), &path)
+            .expect_err("missing member must fail");
+        assert_matches!(err, SaveReadError::MissingMember { .. });
+        assert_eq!(app.world().resource::<Position>().x, 1.0);
+    }
+
+    #[test]
+    fn strict_load_reports_missing_file_as_not_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("none.ron");
+
+        let mut app = App::new();
+        app.add_plugins(SimpleSavePlugin);
+        app.register_group_member::<SlotGroup, Position>();
+
+        let err = load_group_strict::<SlotGroup>(app.world_mut(), &path).expect_err("must fail");
+        assert!(err.is_not_found());
+    }
+
+    #[test]
     fn group_round_trip_with_two_resource_types() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("slot_1.ron");
@@ -150,6 +210,30 @@ mod tests {
 
         assert_eq!(load_app.world().resource::<Position>().x, 3.0);
         assert_eq!(load_app.world().resource::<Health>().hp, 42);
+    }
+
+    #[test]
+    fn strict_load_applies_all_members_when_everything_is_valid() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slot_1.ron");
+
+        let mut save_app = App::new();
+        save_app.add_plugins(SimpleSavePlugin);
+        save_app.register_group_member::<SlotGroup, Position>();
+        save_app.register_group_member::<SlotGroup, Health>();
+        save_app.world_mut().resource_mut::<Position>().x = 3.0;
+        save_app.world_mut().resource_mut::<Health>().hp = 42;
+
+        save_group::<SlotGroup>(save_app.world(), &path).expect("save should succeed");
+
+        let mut load_group_strict = App::new();
+        load_group_strict.add_plugins(SimpleSavePlugin);
+        load_group_strict.register_group_member::<SlotGroup, Position>();
+        load_group_strict.register_group_member::<SlotGroup, Health>();
+        load_group::<SlotGroup>(load_group_strict.world_mut(), &path).expect("load should succeed");
+
+        assert_eq!(load_group_strict.world().resource::<Position>().x, 3.0);
+        assert_eq!(load_group_strict.world().resource::<Health>().hp, 42);
     }
 
     #[test]
