@@ -10,7 +10,7 @@ mod storage;
 pub use crate::{
     error::{SaveReadError, SaveWriteError},
     group::{SaveGroup, read_member},
-    location::SaveLocation,
+    location::{LocationError, SaveLocation},
     messages::{LoadFailed, SaveFailed},
     plugin::{
         SaveAppExt, SaveGroupExt, SaveTiming, SimpleSavePlugin, load_group, save_group, save_now,

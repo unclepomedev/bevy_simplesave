@@ -24,7 +24,7 @@ pub enum SaveLocation {
 }
 
 #[derive(Debug)]
-pub(crate) enum LocationError {
+pub enum LocationError {
     Unavailable(String),
     InvalidSubPath(PathBuf),
     Io { path: PathBuf, source: IoError },
@@ -69,7 +69,8 @@ fn resolve_app_data_dir(dirs: Option<ProjectDirs>, sub: &Path) -> Result<PathBuf
 }
 
 impl SaveLocation {
-    pub(crate) fn resolve(&self) -> Result<PathBuf, LocationError> {
+    /// Resolves the location to an absolute path (a file or a directory, as the caller uses it).
+    pub fn resolve(&self) -> Result<PathBuf, LocationError> {
         match self {
             SaveLocation::ExeRelative(sub) => {
                 validate_sub_path(sub)?;
