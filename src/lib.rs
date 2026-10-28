@@ -9,7 +9,7 @@ mod storage;
 
 pub use crate::{
     error::{SaveReadError, SaveWriteError},
-    group::{SaveGroup, read_member},
+    group::{SaveGroup, SaveMember, read_member},
     location::{LocationError, SaveLocation},
     messages::{LoadFailed, SaveFailed},
     plugin::{
