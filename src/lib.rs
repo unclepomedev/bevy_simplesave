@@ -13,8 +13,7 @@ pub use crate::{
     location::SaveLocation,
     messages::{LoadFailed, SaveFailed},
     plugin::{
-        SaveAppExt, SaveGroupExt, SaveTiming, SimpleSavePlugin, load_group, load_group_strict,
-        save_group, save_now,
+        SaveAppExt, SaveGroupExt, SaveTiming, SimpleSavePlugin, load_group, save_group, save_now,
     },
     saveable::Saveable,
 };
