@@ -7,7 +7,7 @@ mod timing;
 
 pub use self::{
     app_ext::SaveAppExt,
-    group_ext::{SaveGroupExt, load_group, load_group_strict, save_group},
+    group_ext::{SaveGroupExt, load_group, save_group},
     save_now::save_now,
     timing::SaveTiming,
 };

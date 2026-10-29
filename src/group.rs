@@ -1,8 +1,13 @@
-use crate::{LoadFailed, SaveReadError, SaveWriteError, storage, storage::StorageError};
+use crate::{SaveReadError, SaveWriteError, storage, storage::StorageError};
 use bevy_ecs::{resource::Resource, world::World};
 use ron::value::RawValue;
 use serde::{Serialize, de::DeserializeOwned};
-use std::{any::type_name, collections::HashMap, marker::PhantomData, path::Path};
+use std::{
+    any::{TypeId, type_name},
+    collections::HashMap,
+    marker::PhantomData,
+    path::Path,
+};
 
 /// A marker type identifying a save group. Implement this on an empty
 /// struct to give the group a name at the type level.
@@ -15,9 +20,16 @@ use std::{any::type_name, collections::HashMap, marker::PhantomData, path::Path}
 /// ```
 pub trait SaveGroup: 'static {}
 
-pub fn read_member<R: DeserializeOwned>(path: impl AsRef<Path>) -> Result<R, SaveReadError> {
+/// A resource that can be saved as a member of a [`SaveGroup`] file, under a fixed key.
+///
+/// The key ties the data in a file to a type: keep it unique within a group and do not change it once files exist.
+pub trait SaveMember: Resource + Serialize + DeserializeOwned {
+    const KEY: &'static str;
+}
+
+pub fn read_member<R: SaveMember>(path: impl AsRef<Path>) -> Result<R, SaveReadError> {
     let mut bag = read_bag(path.as_ref())?;
-    decode_member::<R>(bag.remove(type_name::<R>()))
+    decode_member::<R>(bag.remove(R::KEY))
 }
 
 pub(crate) type SaveBag = HashMap<String, Box<RawValue>>;
@@ -25,10 +37,9 @@ pub(crate) type Commit = Box<dyn FnOnce(&mut World) + Send>;
 
 /// A type-erased save/load operation for one resource type within a group.
 pub(crate) trait ErasedSave: Send + Sync + 'static {
-    fn type_key(&self) -> &'static str;
+    fn key(&self) -> &'static str;
+    fn member_type(&self) -> TypeId;
     fn extract(&self, world: &World) -> Result<Box<RawValue>, SaveWriteError>;
-    /// Missing key falls back to `Default`; a broken value also falls back and emits `LoadFailed`.
-    fn apply(&self, world: &mut World, value: Option<Box<RawValue>>);
     /// Decodes without touching the world. Missing key or broken value is an error.
     fn prepare(&self, value: Option<Box<RawValue>>) -> Result<Commit, SaveReadError>;
 }
@@ -41,12 +52,13 @@ impl<R> SaveEntry<R> {
     }
 }
 
-impl<R> ErasedSave for SaveEntry<R>
-where
-    R: Resource + Serialize + DeserializeOwned + Default,
-{
-    fn type_key(&self) -> &'static str {
-        type_name::<R>()
+impl<R: SaveMember> ErasedSave for SaveEntry<R> {
+    fn key(&self) -> &'static str {
+        R::KEY
+    }
+
+    fn member_type(&self) -> TypeId {
+        TypeId::of::<R>()
     }
 
     fn extract(&self, world: &World) -> Result<Box<RawValue>, SaveWriteError> {
@@ -60,20 +72,6 @@ where
             resource_type: type_name::<R>().to_string(),
             source,
         })
-    }
-
-    fn apply(&self, world: &mut World, value: Option<Box<RawValue>>) {
-        match decode_member::<R>(value) {
-            Ok(resource) => world.insert_resource(resource),
-            Err(SaveReadError::MissingMember { .. }) => world.insert_resource(R::default()),
-            Err(error) => {
-                world.insert_resource(R::default());
-                world.write_message(LoadFailed {
-                    resource_type: type_name::<R>(),
-                    error,
-                });
-            }
-        }
     }
 
     fn prepare(&self, value: Option<Box<RawValue>>) -> Result<Commit, SaveReadError> {
@@ -91,7 +89,7 @@ pub(crate) fn save_group_bag(
 ) -> Result<(), SaveWriteError> {
     let mut bag = SaveBag::new();
     for entry in entries {
-        bag.insert(entry.type_key().to_string(), entry.extract(world)?);
+        bag.insert(entry.key().to_string(), entry.extract(world)?);
     }
     let ron_str = storage::serialize_to_ron(&bag).map_err(|e| match e {
         StorageError::Serialize(e) => SaveWriteError::Serialize {
@@ -106,30 +104,8 @@ pub(crate) fn save_group_bag(
     })
 }
 
+/// Interprets all members first and applies them to the world only if all of them are valid.
 pub(crate) fn load_group_bag(
-    world: &mut World,
-    entries: &[Box<dyn ErasedSave>],
-    path: &Path,
-) -> Result<(), SaveReadError> {
-    let mut bag = match read_bag(path) {
-        Ok(bag) => bag,
-        Err(e) if e.is_not_found() => {
-            for entry in entries {
-                entry.apply(world, None);
-            }
-            return Ok(());
-        }
-        Err(e) => return Err(e),
-    };
-    for entry in entries {
-        let value = bag.remove(entry.type_key());
-        entry.apply(world, value);
-    }
-    Ok(())
-}
-
-/// Interpret all members first and apply the results to the world only if everything is successful.
-pub(crate) fn load_group_bag_strict(
     world: &mut World,
     entries: &[Box<dyn ErasedSave>],
     path: &Path,
@@ -137,7 +113,7 @@ pub(crate) fn load_group_bag_strict(
     let mut bag = read_bag(path)?;
     let commits = entries
         .iter()
-        .map(|entry| entry.prepare(bag.remove(entry.type_key())))
+        .map(|entry| entry.prepare(bag.remove(entry.key())))
         .collect::<Result<Vec<_>, _>>()?;
     for commit in commits {
         commit(world);
