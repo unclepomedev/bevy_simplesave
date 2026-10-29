@@ -11,7 +11,7 @@ A small, dependency-light crate for saving Bevy `Resource`s to `.ron` files.
 3. Register the members with `register_group_member`. This does not create the resources.
 4. Save with `save_group` and load with `load_group`.
 
-No plugin is needed.
+No `bevy_simplesave` plugin is needed.
 
 ```rust
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
