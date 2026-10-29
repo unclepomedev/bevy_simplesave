@@ -33,55 +33,66 @@ fn main() {
 }
 ```
 
+If the file is missing or broken, the resource falls back to `Default` (and a `LoadFailed` message is written for a broken file).
+
 ### Bundling multiple resources into one file
 
-Use `register_group_member` instead of `register_saveable` when several
-resources should be saved and loaded together as a single file (e.g. save slots).
-Registering a member inserts its `Default` value into the world right away.
+Use a save group when several resources should be saved and loaded together as a single file (e.g. save slots).
+Group files are read strictly: nothing silently falls back to a default.
+
+1. Define a group with a marker type that implements `SaveGroup`.
+2. Derive `SaveMember` on each resource and give it a key with `#[save(key = "...")]`.
+3. Register the members with `register_group_member`. This does not create the resources.
+4. Save with `save_group` and load with `load_group`.
 
 ```rust
-use bevy::prelude::*;
-use bevy_simplesave::{SaveGroup, SaveGroupExt, SimpleSavePlugin, load_group_strict, save_group};
+use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy_simplesave::{SaveGroup, SaveGroupExt, SaveMember, load_group, save_group};
 use serde::{Deserialize, Serialize};
 
-struct SlotGroup;
+struct SlotGroup;  // 1
 impl SaveGroup for SlotGroup {}
 
-#[derive(Resource, Serialize, Deserialize, Default)]
+#[derive(Resource, Serialize, Deserialize, SaveMember)]  // 2
+#[save(key = "position")]
 struct Position { x: f32, y: f32 }
 
-#[derive(Resource, Serialize, Deserialize, Default)]
+#[derive(Resource, Serialize, Deserialize, SaveMember)]
+#[save(key = "health")]
 struct Health { hp: u32 }
 
 fn main() {
     App::new()
-        .add_plugins(SimpleSavePlugin)
-        .register_group_member::<SlotGroup, Position>()
+        .register_group_member::<SlotGroup, Position>()  // 3
         .register_group_member::<SlotGroup, Health>()
-        .add_systems(Update, (save_slot, load_slot))
+        .insert_resource(Position { x: 0.0, y: 0.0 })
+        .insert_resource(Health { hp: 100 })
+        .add_systems(
+            Update,
+            (
+                save_slot.run_if(input_just_pressed(KeyCode::F5)),
+                load_slot.run_if(input_just_pressed(KeyCode::F9)),
+            ),
+        )
         .run();
 }
 
-fn save_slot(world: &World) {
-    save_group::<SlotGroup>(world, "saves/slot_1.ron").expect("failed to save slot");
+fn save_slot(world: &World) {  // 4
+    if let Err(e) = save_group::<SlotGroup>(world, "saves/slot_1.ron") {
+        error!("failed to save slot: {e}");
+    }
 }
 
 // Loading needs `&mut World` (an exclusive system).
 fn load_slot(world: &mut World) {
-    if let Err(e) = load_group_strict::<SlotGroup>(world, "saves/slot_1.ron") {
+    if let Err(e) = load_group::<SlotGroup>(world, "saves/slot_1.ron") {
         error!("failed to load slot: {e}");
     }
 }
 ```
 
-There are two ways to load a group:
-
-| Function            | Missing file                | Missing / broken member                                | On failure                  |
-|:--------------------|:----------------------------|:-------------------------------------------------------|:----------------------------|
-| `load_group`        | every member gets `Default` | that member gets `Default` and `LoadFailed` is written | still returns `Ok`          |
-| `load_group_strict` | `Err` (`is_not_found()`)    | `Err`                                                  | the world is left untouched |
-
-Use `load_group_strict` when a broken file must not turn into silent defaults (e.g. save slots).
+`load_group` fails if the file or any member is missing or broken. On failure the world is left untouched.
+`SaveReadError::is_not_found()` tells a missing file from a broken one.
 
 To inspect a file without touching the world (e.g. to list save slots), read a single member:
 
@@ -95,10 +106,13 @@ match read_member::<Health>("saves/slot_1.ron") {
 }
 ```
 
+`SaveMember` can also be implemented by hand: `impl SaveMember for Health { const KEY: &'static str = "health"; }`.
+A key must be unique within a group (registering two types under one key panics) and must not change once files exist.
+
 ### Handling errors
 
-Save/load failures inside systems never panic. Instead, the plugin writes a `SaveFailed` or `LoadFailed` message,
-which you can read with a `MessageReader` to log or notify the user:
+Save/load failures of single resources inside systems never panic. Instead, the plugin writes a `SaveFailed` or
+`LoadFailed` message, which you can read with a `MessageReader` to log or notify the user:
 
 ```rust
 use bevy::prelude::*;
@@ -114,8 +128,7 @@ fn report_errors(mut saves: MessageReader<SaveFailed>, mut loads: MessageReader<
 }
 ```
 
-`LoadFailed` is written when a registered resource or a group member (via `load_group`) falls back to its default.
-`save_group`, `load_group_strict` and `read_member` return a `Result` instead.
+The group functions (`save_group`, `load_group`, `read_member`) return a `Result` instead.
 
 ## What it does and does not do
 
@@ -124,8 +137,7 @@ fn report_errors(mut saves: MessageReader<SaveFailed>, mut loads: MessageReader<
 - Runs on Windows / Linux / macOS (not WASM).
 - No encryption / obfuscation.
 - Missing fields are filled in via `#[serde(default)]`: perform a schema migration yourself if necessary.
-- Group members are stored under their Rust type name (`std::any::type_name`):
-  renaming or moving a type makes its old data unreadable.
+- A type cannot be both a single saved resource (`SaveResource`) and a group member (`SaveMember`).
 
 ## Compatible Bevy versions
 
