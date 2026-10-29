@@ -39,6 +39,9 @@ impl SaveGroupExt for App {
 }
 
 /// Saves every resource registered to group `G` into a single file at `path`.
+///
+/// Fails with [`SaveWriteError::ResourceMissing`] if a member's resource does not exist;
+/// nothing is written then. The file is replaced atomically.
 pub fn save_group<G: SaveGroup>(
     world: &World,
     path: impl AsRef<Path>,
@@ -53,7 +56,9 @@ pub fn save_group<G: SaveGroup>(
 }
 
 /// Loads every member of group `G` from the file at `path`.
-/// Fails if the file or any member is missing or broken; on failure the world is left untouched.
+///
+/// All-or-nothing: every member is decoded first and applied only if all are valid, so on failure the world is left untouched.
+/// On success each member's resource is inserted, replacing an existing one. Keys in the file that no registered member uses are ignored.
 pub fn load_group<G: SaveGroup>(
     world: &mut World,
     path: impl AsRef<Path>,
