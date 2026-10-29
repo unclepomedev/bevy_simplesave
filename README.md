@@ -6,44 +6,12 @@ A small, dependency-light crate for saving Bevy `Resource`s to `.ron` files.
 
 ## How to use
 
-### Saving a single resource
-
-1. (must) Add `SimpleSavePlugin` to your app.
-2. Derive `SaveResource` on your resource.
-3. Add the timing to save your resource with `#[save(timing = auto | manual)]`.
-    * `auto`: saves the resource whenever it changes
-    * `manual`: saves the resource when `save_now` is called
-4. Register your resource with `register_saveable`.
-    * The `SaveLocation`s are `ExeRelative`, `AppData` and `Custom`.
-
-```rust
-use bevy::prelude::*;
-use bevy_simplesave::{SaveAppExt, SaveLocation, SimpleSavePlugin, SaveResource};
-use serde::{Deserialize, Serialize};
-
-#[derive(Resource, Serialize, Deserialize, Default, SaveResource)]  // 2
-#[save(timing = auto)]  // 3
-struct Settings { volume: f32 }
-
-fn main() {
-    App::new()
-        .add_plugins(SimpleSavePlugin)  // 1
-        .register_saveable::<Settings>(SaveLocation::ExeRelative("data/settings.ron".into()))  // 4
-        .run();
-}
-```
-
-If the file is missing or broken, the resource falls back to `Default` (and a `LoadFailed` message is written for a broken file).
-
-### Bundling multiple resources into one file
-
-Use a save group when several resources should be saved and loaded together as a single file (e.g. save slots).
-Group files are read strictly: nothing silently falls back to a default.
-
 1. Define a group with a marker type that implements `SaveGroup`.
 2. Derive `SaveMember` on each resource and give it a key with `#[save(key = "...")]`.
 3. Register the members with `register_group_member`. This does not create the resources.
 4. Save with `save_group` and load with `load_group`.
+
+No plugin is needed.
 
 ```rust
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
@@ -94,7 +62,12 @@ fn load_slot(world: &mut World) {
 `load_group` fails if the file or any member is missing or broken. On failure the world is left untouched.
 `SaveReadError::is_not_found()` tells a missing file from a broken one.
 
-To inspect a file without touching the world (e.g. to list save slots), read a single member:
+A key must be unique within a group (registering two types under one key panics) and must not change once files exist.
+`SaveMember` can also be implemented by hand: `impl SaveMember for Health { const KEY: &'static str = "health"; }`.
+
+### Reading one member
+
+`read_member` reads a single member without a world or a registration, e.g. to list save slots:
 
 ```rust
 use bevy_simplesave::read_member;
@@ -106,44 +79,37 @@ match read_member::<Health>("saves/slot_1.ron") {
 }
 ```
 
-`SaveMember` can also be implemented by hand: `impl SaveMember for Health { const KEY: &'static str = "health"; }`.
-A key must be unique within a group (registering two types under one key panics) and must not change once files exist.
+It also suits settings, where a missing or broken value should become a default:
+`read_member::<Settings>(path).unwrap_or_default()`.
 
-### Handling errors
+### Where to put the file
 
-Save/load failures of single resources inside systems never panic. Instead, the plugin writes a `SaveFailed` or
-`LoadFailed` message, which you can read with a `MessageReader` to log or notify the user:
+The functions take any path. `SaveLocation` (`ExeRelative`, `AppData` or `Custom`) resolves to one:
 
 ```rust
-use bevy::prelude::*;
-use bevy_simplesave::{LoadFailed, SaveFailed};
+use bevy_simplesave::SaveLocation;
 
-fn report_errors(mut saves: MessageReader<SaveFailed>, mut loads: MessageReader<LoadFailed>) {
-    for msg in saves.read() {
-        error!("failed to save {}: {}", msg.resource_type, msg.error);
-    }
-    for msg in loads.read() {
-        error!("failed to load {}: {}", msg.resource_type, msg.error);
-    }
-}
+let path = SaveLocation::ExeRelative("saves/slot_1.ron".into()).resolve()?;
 ```
 
-The group functions (`save_group`, `load_group`, `read_member`) return a `Result` instead.
+### Errors
+
+`save_group` returns a `SaveWriteError`; `load_group` and `read_member` return a `SaveReadError`. Nothing panics except
+registering two types under one key.
 
 ## What it does and does not do
 
-- Saves/loads plain `Resource` structs as `.ron` files (see above for locations, timing, and grouping).
+- Saves/loads plain `Resource` structs as `.ron` files, bundled by group.
 - Writes files atomically (temporary file, then rename).
 - Runs on Windows / Linux / macOS (not WASM).
 - No encryption / obfuscation.
 - Missing fields are filled in via `#[serde(default)]`: perform a schema migration yourself if necessary.
-- A type cannot be both a single saved resource (`SaveResource`) and a group member (`SaveMember`).
 
 ## Compatible Bevy versions
 
 | Bevy version | `bevy_simplesave` version |
 |:-------------|:--------------------------|
-| `0.20`       | `0.1`                     |
+| `0.20`       | `0.2`                     |
 
 ## License
 
