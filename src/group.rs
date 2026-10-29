@@ -4,7 +4,7 @@ use ron::value::RawValue;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
     any::{TypeId, type_name},
-    collections::HashMap,
+    collections::BTreeMap,
     marker::PhantomData,
     path::Path,
 };
@@ -27,12 +27,16 @@ pub trait SaveMember: Resource + Serialize + DeserializeOwned {
     const KEY: &'static str;
 }
 
+/// Reads one member from a group file, without a world or a registration.
+///
+/// The other members are not decoded, so a neighbor of the wrong shape does not matter.
+/// A missing file is [`SaveReadError::Io`]; a file without the key is [`SaveReadError::MissingMember`].
 pub fn read_member<R: SaveMember>(path: impl AsRef<Path>) -> Result<R, SaveReadError> {
     let mut bag = read_bag(path.as_ref())?;
     decode_member::<R>(bag.remove(R::KEY))
 }
 
-pub(crate) type SaveBag = HashMap<String, Box<RawValue>>;
+pub(crate) type SaveBag = BTreeMap<String, Box<RawValue>>;
 pub(crate) type Commit = Box<dyn FnOnce(&mut World) + Send>;
 
 /// A type-erased save/load operation for one resource type within a group.

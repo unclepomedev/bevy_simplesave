@@ -30,6 +30,13 @@ fn atomic_write(parent: &Path, path: &Path, bytes: &[u8]) -> Result<(), StorageE
             path: path.to_path_buf(),
             source,
         })?;
+    tmp_file
+        .as_file()
+        .sync_all()
+        .map_err(|source| StorageError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
     tmp_file.persist(path).map_err(|e| StorageError::Io {
         path: path.to_path_buf(),
         source: e.error,
